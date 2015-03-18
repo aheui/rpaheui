@@ -1,4 +1,4 @@
-
+#!/usr/bin/env python
 # coding: utf-8
 import os
 #import rpython.rlib import jit
@@ -73,6 +73,7 @@ OP_OUTNUM = 19
 OP_OUTCHAR = 20
 OP_INNUM = 21
 OP_INCHAR = 22
+OP_BRPOP = -2 # special
 OP_JMP = -1 # special
 
 MV_RIGHT = 0 # ㅏ
@@ -101,14 +102,15 @@ VAL_QUEUE = 21
 VAL_NUMBER = 21
 VAL_UNICODE = 27
 
-OP_HASOP = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1]
-OP_USEVAL = [0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]
+OP_HASOP = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+OP_USEVAL = [0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]
+OP_REQSIZE = [0, 0, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 2, 0, 1, 1, 0, 0, 0, 0]
 VAL_CONSTS = [0, 2, 4, 4, 2, 5, 5, 3, 5, 7, 9, 9, 7, 9, 9, 8, 4, 4, 6, 2, 4, 1, 3, 4, 3, 4, 4, 3]
 
 DIR_DOWN = 1
 DIR_RIGHT = 2
-DIR_UP = 3
-DIR_LEFT = 4
+DIR_UP = -1
+DIR_LEFT = -2
 
 
 
@@ -133,6 +135,10 @@ class Stack(object):
 
     def last(self):
         return self.list[-1]
+
+    def __len__(self):
+        return len(self.list)
+
 
 class Queue(Stack):
     def pop(self):
@@ -269,7 +275,7 @@ def serialize(primitive, code_map, serialized, position, direction):
         posdir = position, direction
         if posdir in code_map:
             index = code_map[posdir]
-            code_map[position, -1] = len(serialized)
+            code_map[position, -direction] = len(serialized)
             serialized.append((OP_JMP, index))
             break
 
@@ -301,12 +307,21 @@ def serialize(primitive, code_map, serialized, position, direction):
             if op == OP_PUSH:
                 serialized.append((op, VAL_CONSTS[val]))
             elif op == OP_BRZ:
-                # TODO
-                assert False
-            elif OP_USEVAL[op]:
-                serialized.append((op, val))
+                idx = len(serialized)
+                serialized.append((OP_BRZ, -1))
+                position1 = primitive.advance_position(position, direction, step)
+                serialize(primitive, code_map, serialized, position1, direction)
+                serialized[idx] = OP_BRZ, len(serialized)
+                position2 = primitive.advance_position(position, -direction, step)
+                serialize(primitive, code_map, serialized, position2, -direction)
             else:
-                serialized.append((op, -1))
+                req_size = OP_REQSIZE[op]
+                #if req_size > 0:
+                #    serialized.append((OP_BRPOP, req_size))
+                if OP_USEVAL[op]:
+                    serialized.append((op, val))
+                else:
+                    serialized.append((op, -1))
 
         position = primitive.advance_position(position, direction, step)
 
@@ -369,7 +384,7 @@ def mainloop(program, debug):
             os.write(1, str(r))
         elif op == OP_OUTCHAR:
             r = s.selected.pop()
-            os.write(1, chr(r))
+            os.write(1, unichr(r).encode('utf-8'))
         elif op == OP_INNUM:
             numchars = []
             while True:
