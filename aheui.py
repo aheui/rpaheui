@@ -4,10 +4,10 @@ import os
 #import rpython.rlib import jit
 
 DEBUG = False
+OPCODE_NAMES = [None, None, 'div', 'add', 'mul', 'mod', 'pop', 'push', 'dup', 'sel', 'mov', None, 'cmp', None, 'brz', None, 'sub', 'swap', 'halt', 'popnum', 'popchar', 'pushnum', 'pushchar', 'brpop2', 'brpop1', 'jmp']
 
 class Debug(object):
     ENABLED = DEBUG
-    OPCODES = [None, None, 'div', 'add', 'mul', 'mod', 'pop', 'push', 'dup', 'sel', 'mov', None, 'cmp', None, 'brz', None, 'sub', 'swap', 'halt', 'outnum', 'outchar', 'innum', 'inchar', 'brpop2', 'brpop1', 'jmp']
 
     def __init__(self, primitive, serialized, code_map):
         self.primitive = primitive
@@ -23,39 +23,123 @@ class Debug(object):
     def show(self, pc):
         if not self.ENABLED: return
 
-        opcode, value = self.serialized[pc]
+        op, value = self.serialized[pc]
         positions = self.inv_map.get(pc, [])
         if not positions:
             os.write(2, 'No instruction information for pc %s\n' % pc)
         for position in positions:
             char = self.primitive.pane[position[0]]
-            os.write(2, (u'%s %s(%s) %s # %s\n' % (char, self.OPCODES[opcode], unichr(0x1100 + opcode), value, position)).encode('utf-8'))
+            os.write(2, (u'%s %s(%s) %s # %s\n' % (char, OPCODE_NAMES[op], unichr(0x1100 + op), value, position)).encode('utf-8'))
 
     def dump(self):
-        if not self.ENABLED: return
         keys = sorted(self.inv_map.keys())
         for k in keys:
             pos = self.inv_map[k]
             char = self.primitive.pane[pos[0][0]]
             os.write(2, (u'%d %s\n' % (k, char)).encode('utf-8'))
 
-    def export(self):
-        if not self.ENABLED: return
-        for i, (op, val) in enumerate(self.serialized):
-            code = self.OPCODES[op]
-            if code is None:
-                code = 'inst' + str(op)
-            if val != -1:
-                print code, val, ';', i
-            else:
-                print code, ';', i
-
     def storage(self, storage):
-        if not self.ENABLED: return
         for i, l in enumerate(storage.lists):
             marker = u':' if l == storage.selected else u' '
             os.write(2, (u'%s (%d):%s' % (unichr(0x11a8 + i - 1), i, marker)).encode('utf-8'))
             os.write(2, ('%s\n' % l.list))
+
+
+class Assembler(object):
+    def __init__(self):
+        self.lines = []
+        self.debug = None
+
+    def compile(self, program):
+        """Compile to aheui-assembly representation."""
+        primitive = PrimitiveProgram(program)
+
+        code_map = {}
+        self.serialize(primitive, code_map, (0, 0), DIR_DOWN)
+        self.debug = Debug(primitive, self.lines, code_map)
+
+    def serialize(self, primitive, code_map, position, direction):
+        while True:
+            posdir = position, direction
+            if posdir in code_map:
+                index = code_map[posdir]
+                if DEBUG: code_map[position, -direction] = len(self.lines)
+                self.lines.append((OP_JMP, index))
+                break
+
+            code_map[posdir] = len(self.lines)
+            if not position in primitive.pane:
+                position = primitive.advance_position(position, direction)
+                continue
+
+            op, mv, val = primitive.decode(position)
+            direction, step = dir_from_mv(mv, direction)
+            if OP_HASOP[op]:
+                if op == OP_POP:
+                    if val == VAL_NUMBER:
+                        op = OP_POPNUM
+                    elif val == VAL_UNICODE:
+                        op = OP_POPCHAR
+                    else:
+                        pass
+                elif op == OP_PUSH:
+                    if val == VAL_NUMBER:
+                        op = OP_PUSHNUM
+                    elif val == VAL_UNICODE:
+                        op = OP_PUSHCHAR
+                    else:
+                        pass
+                else:
+                    pass
+
+                if op == OP_PUSH:
+                    self.lines.append((op, VAL_CONSTS[val]))
+                elif op == OP_BRZ:
+                    idx = len(self.lines)
+                    if DEBUG: code_map[position, -direction] = idx
+                    self.lines.append((OP_BRZ, -1))
+                    position1 = primitive.advance_position(position, direction, step)
+                    self.serialize(primitive, code_map, position1, direction)
+                    self.lines[idx] = OP_BRZ, len(self.lines)
+                    position2 = primitive.advance_position(position, -direction, step)
+                    self.serialize(primitive, code_map, position2, -direction)
+                else:
+                    req_size = OP_REQSIZE[op]
+                    if req_size > 0:
+                        brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
+                        idx = len(self.lines)
+                        if DEBUG:
+                            code_map[position, -direction] = idx
+                            code_map[position, direction] = idx + 1
+                        self.lines.append((brop, -1))
+                        if OP_USEVAL[op]:
+                            self.lines.append((op, val))
+                        else:
+                            self.lines.append((op, -1))
+                        position1 = primitive.advance_position(position, direction, step)
+                        self.serialize(primitive, code_map, position1, direction)
+                        self.lines[idx] = brop, len(self.lines)
+                        position2 = primitive.advance_position(position, -direction, step)
+                        self.serialize(primitive, code_map, position2, -direction)
+                    else:
+                        if OP_USEVAL[op]:
+                            self.lines.append((op, val))
+                        else:
+                            self.lines.append((op, -1))
+
+            position = primitive.advance_position(position, direction, step)
+
+
+    def export(self):
+        for i, (op, val) in enumerate(self.lines):
+            code = OPCODE_NAMES[op]
+            if code is None:
+                code = 'inst' + str(op)
+            if val != -1:
+                print '%s %s; L%d' % (code, val, i)
+            else:
+                print '%s; L%d' % (code, i)
+
 
 # ㄱ
 # ㄲ
@@ -77,10 +161,10 @@ OP_SUB = 16 # ㅌ
 OP_SWAP= 17 # ㅍ
 OP_HALT= 18 # ㅎ
 ## end of primitive
-OP_OUTNUM = 19
-OP_OUTCHAR = 20
-OP_INNUM = 21
-OP_INCHAR = 22
+OP_POPNUM = 19
+OP_POPCHAR = 20
+OP_PUSHNUM = 21
+OP_PUSHCHAR = 22
 OP_BRPOP2 = -3 # special
 OP_BRPOP1 = -2 # special
 OP_JMP = -1 # special
@@ -279,86 +363,6 @@ def dir_from_mv(mv_code, direction):
     else:
         return direction, 1
 
-def serialize(primitive, code_map, serialized, position, direction):
-    while True:
-        posdir = position, direction
-        if posdir in code_map:
-            index = code_map[posdir]
-            if DEBUG: code_map[position, -direction] = len(serialized)
-            serialized.append((OP_JMP, index))
-            break
-
-        code_map[posdir] = len(serialized)
-        if not position in primitive.pane:
-            position = primitive.advance_position(position, direction)
-            continue
-
-        op, mv, val = primitive.decode(position)
-        direction, step = dir_from_mv(mv, direction)
-        if OP_HASOP[op]:
-            if op == OP_POP:
-                if val == VAL_NUMBER:
-                    op = OP_OUTNUM
-                elif val == VAL_UNICODE:
-                    op = OP_OUTCHAR
-                else:
-                    pass
-            elif op == OP_PUSH:
-                if val == VAL_NUMBER:
-                    op = OP_INNUM
-                elif val == VAL_UNICODE:
-                    op = OP_INCHAR
-                else:
-                    pass
-            else:
-                pass
-
-            if op == OP_PUSH:
-                serialized.append((op, VAL_CONSTS[val]))
-            elif op == OP_BRZ:
-                idx = len(serialized)
-                if DEBUG: code_map[position, -direction] = idx
-                serialized.append((OP_BRZ, -1))
-                position1 = primitive.advance_position(position, direction, step)
-                serialize(primitive, code_map, serialized, position1, direction)
-                serialized[idx] = OP_BRZ, len(serialized)
-                position2 = primitive.advance_position(position, -direction, step)
-                serialize(primitive, code_map, serialized, position2, -direction)
-            else:
-                req_size = OP_REQSIZE[op]
-                if req_size > 0:
-                    brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
-                    idx = len(serialized)
-                    if DEBUG:
-                        code_map[position, -direction] = idx
-                        code_map[position, direction] = idx + 1
-                    serialized.append((brop, -1))
-                    if OP_USEVAL[op]:
-                        serialized.append((op, val))
-                    else:
-                        serialized.append((op, -1))
-                    position1 = primitive.advance_position(position, direction, step)
-                    serialize(primitive, code_map, serialized, position1, direction)
-                    serialized[idx] = brop, len(serialized)
-                    position2 = primitive.advance_position(position, -direction, step)
-                    serialize(primitive, code_map, serialized, position2, -direction)
-                else:
-                    if OP_USEVAL[op]:
-                        serialized.append((op, val))
-                    else:
-                        serialized.append((op, -1))
-
-        position = primitive.advance_position(position, direction, step)
-
-def parse(program):
-    primitive = PrimitiveProgram(program)
-
-    code_map = {}
-    serialized = []
-    serialize(primitive, code_map, serialized, (0, 0), DIR_DOWN)
-
-    debug = Debug(primitive, serialized, code_map)
-    return serialized, debug
 
 def mainloop(program, debug):
     #debug.export()
@@ -414,13 +418,13 @@ def mainloop(program, debug):
             if len(s.selected) < 2:
                 pc = value
                 continue
-        elif op == OP_OUTNUM:
+        elif op == OP_POPNUM:
             r = s.selected.pop()
             os.write(1, str(r))
-        elif op == OP_OUTCHAR:
+        elif op == OP_POPCHAR:
             r = s.selected.pop()
             os.write(1, unichr(r).encode('utf-8'))
-        elif op == OP_INNUM:
+        elif op == OP_PUSHNUM:
             numchars = []
             while True:
                 numchar = os.read(0, 1)
@@ -431,7 +435,7 @@ def mainloop(program, debug):
             assert len(numchars) > 0
             num = int(''.join(numchars))
             s.selected.push(num)
-        elif op == OP_INCHAR:
+        elif op == OP_PUSHCHAR:
             buf = os.read(0, 1)
             if buf:
                 v = ord(buf[0])
@@ -481,8 +485,9 @@ def run(fp):
             break
         program_contents += read
     os.close(fp)
-    program, debug = parse(program_contents)
-    return mainloop(program, debug)
+    assembler = Assembler()
+    assembler.compile(program_contents)
+    return mainloop(assembler.lines, assembler.debug)
 
 def entry_point(argv):
     try:
