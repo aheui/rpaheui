@@ -1,7 +1,20 @@
 #!/usr/bin/env python
 # coding: utf-8
 import os
-#import rpython.rlib import jit
+try:
+    from rpython.rlib.jit import JitDriver
+    from rpython.rlib.jit import assert_green
+except ImportError:
+    class JitDriver(object):
+        def __init__(self, **kw): pass
+        def jit_merge_point(self, **kw): pass
+        def can_enter_jit(self, **kw): pass
+    def purefunction(f): return f
+
+def get_location(pc, stacksize, program):
+    return "%s" % program[pc]
+
+jitdriver = JitDriver(greens=['pc', 'stacksize', 'program'], reds=['storage'], get_printable_location=get_location)
 
 DEBUG = False
 OPCODE_NAMES = [None, None, 'div', 'add', 'mul', 'mod', 'pop', 'push', 'dup', 'sel', 'mov', None, 'cmp', None, 'brz', None, 'sub', 'swap', 'halt', 'popnum', 'popchar', 'pushnum', 'pushchar', 'brpop2', 'brpop1', 'jmp']
@@ -58,22 +71,24 @@ class Assembler(object):
         self.serialize(primitive, code_map, (0, 0), DIR_DOWN)
         self.debug = Debug(primitive, self.lines, code_map)
 
-    def serialize(self, primitive, code_map, position, direction):
+    def serialize(self, primitive, code_map, position, direction, depth=0):
         while True:
-            posdir = position, direction
-            if posdir in code_map:
-                index = code_map[posdir]
-                if DEBUG: code_map[position, -direction] = len(self.lines)
-                self.lines.append((OP_JMP, index))
-                break
-
-            code_map[posdir] = len(self.lines)
             if not position in primitive.pane:
                 position = primitive.advance_position(position, direction)
                 continue
 
             op, mv, val = primitive.decode(position)
-            direction, step = dir_from_mv(mv, direction)
+            new_direction, step = dir_from_mv(mv, direction)
+            
+            if (position, direction) in code_map:
+                index = code_map[position, direction]
+                code_map[position, direction + 10] = len(self.lines)
+                self.lines.append((OP_JMP, index))
+                break
+
+            code_map[position, direction] = len(self.lines)
+
+            direction = new_direction
             if OP_HASOP[op]:
                 if op == OP_POP:
                     if val == VAL_NUMBER:
@@ -96,36 +111,37 @@ class Assembler(object):
                     self.lines.append((op, VAL_CONSTS[val]))
                 elif op == OP_BRZ:
                     idx = len(self.lines)
-                    if DEBUG: code_map[position, -direction] = idx
+                    code_map[position, direction + 10] = idx
                     self.lines.append((OP_BRZ, -1))
                     position1 = primitive.advance_position(position, direction, step)
-                    self.serialize(primitive, code_map, position1, direction)
+                    self.serialize(primitive, code_map, position1, direction, depth + 1)
                     self.lines[idx] = OP_BRZ, len(self.lines)
                     position2 = primitive.advance_position(position, -direction, step)
-                    self.serialize(primitive, code_map, position2, -direction)
+                    self.serialize(primitive, code_map, position2, -direction, depth + 1)
                 else:
                     req_size = OP_REQSIZE[op]
                     if req_size > 0:
                         brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
                         idx = len(self.lines)
-                        if DEBUG:
-                            code_map[position, -direction] = idx
-                            code_map[position, direction] = idx + 1
+                        code_map[position, direction + 10] = idx
+                        code_map[position, direction] = idx + 1
                         self.lines.append((brop, -1))
                         if OP_USEVAL[op]:
                             self.lines.append((op, val))
                         else:
                             self.lines.append((op, -1))
                         position1 = primitive.advance_position(position, direction, step)
-                        self.serialize(primitive, code_map, position1, direction)
+                        self.serialize(primitive, code_map, position1, direction, depth + 1)
                         self.lines[idx] = brop, len(self.lines)
                         position2 = primitive.advance_position(position, -direction, step)
-                        self.serialize(primitive, code_map, position2, -direction)
+                        self.serialize(primitive, code_map, position2, -direction, depth + 1)
                     else:
                         if OP_USEVAL[op]:
                             self.lines.append((op, val))
                         else:
                             self.lines.append((op, -1))
+                            if op == OP_HALT:
+                                break
 
             position = primitive.advance_position(position, direction, step)
 
@@ -363,15 +379,21 @@ def dir_from_mv(mv_code, direction):
     else:
         return direction, 1
 
+def jitpolicy(driver):
+    from rpython.jit.codewriter.policy import JitPolicy
+    return JitPolicy()
 
 def mainloop(program, debug):
-    #debug.export()
-    s = Storage()
     pc = 0
+    stacksize = 0
+    s = Storage()
+    #debug.export()
     while pc < len(program):
         #debug.storage(s)
         #if DEBUG: raw_input()
         #debug.show(pc)
+        stacksize = min(OP_REQSIZE[program[pc][0]], len(s.selected))
+        jitdriver.jit_merge_point(pc=pc, stacksize=stacksize, program=program, storage=s)
         op, value = program[pc]
         if op == OP_ADD:
             r1, r2 = s.selected.pop(), s.selected.pop()

@@ -1,11 +1,15 @@
 
 RPYTHON=../pypy/rpython/bin/rpython
+RPYTHONFLAGS=--opt=jit
 
 build:
-	$(RPYTHON) aheui.py
+	$(RPYTHON) $(RPYTHONFLAGS) aheui.py
 
 ahsembler:
 	$(RPYTHON) ahsembler.py
 
-test:
+test: build
 	cd snippets && AHEUI=../aheui-c bash test.sh
+
+testpy:
+	cd snippets && AHEUI=../aheui.py bash test.sh
