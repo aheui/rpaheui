@@ -3,6 +3,7 @@
 import os
 try:
     from rpython.rlib.jit import JitDriver
+    from rpython.rlib.jit import purefunction
     from rpython.rlib.jit import assert_green
 except ImportError:
     class JitDriver(object):
@@ -11,14 +12,15 @@ except ImportError:
         def can_enter_jit(self, **kw): pass
     def purefunction(f): return f
 
-def get_location(pc, stacksize, program):
-    return "%s" % program[pc]
-
-jitdriver = JitDriver(greens=['pc', 'stacksize', 'program'], reds=['storage'], get_printable_location=get_location)
-
-DEBUG = False
 OPCODE_NAMES = [None, None, 'div', 'add', 'mul', 'mod', 'pop', 'push', 'dup', 'sel', 'mov', None, 'cmp', None, 'brz', None, 'sub', 'swap', 'halt', 'popnum', 'popchar', 'pushnum', 'pushchar', 'brpop2', 'brpop1', 'jmp']
 
+def get_location(pc, stacksize, program):
+    return "#%d_stack%d_%s_%d" % (pc, stacksize, OPCODE_NAMES[program[pc][0]], program[pc][1])
+
+jitdriver = JitDriver(greens=['pc', 'stacksize', 'program'], reds=['storage', 'selected'], get_printable_location=get_location)
+
+
+DEBUG = False
 class Debug(object):
     ENABLED = DEBUG
 
@@ -51,9 +53,9 @@ class Debug(object):
             char = self.primitive.pane[pos[0][0]]
             os.write(2, (u'%d %s\n' % (k, char)).encode('utf-8'))
 
-    def storage(self, storage):
+    def storage(self, storage, selected=None):
         for i, l in enumerate(storage.lists):
-            marker = u':' if l == storage.selected else u' '
+            marker = u':' if l == selected else u' '
             os.write(2, (u'%s (%d):%s' % (unichr(0x11a8 + i - 1), i, marker)).encode('utf-8'))
             os.write(2, ('%s\n' % l.list))
 
@@ -258,20 +260,14 @@ class Queue(Stack):
         l[0], l[1] = l[1], l[0]
 
 
-class Storage(object):
-    def __init__(self):
-        storage = []
-        for i in range(0, 28):
-            if i == VAL_QUEUE:
-                storage.append(Queue())
-            else:
-                storage.append(Stack())
-        self.lists = storage
-        self.selected = self.lists[0]
-
-    def select(self, index):
-        self.selected = self.lists[index]
-
+def init_storage():
+    storage = []
+    for i in range(0, 28):
+        if i == VAL_QUEUE:
+            storage.append(Queue())
+        else:
+            storage.append(Stack())
+    return storage
 
 class PrimitiveProgram(object):
     def __init__(self, text):
@@ -383,68 +379,77 @@ def jitpolicy(driver):
     from rpython.jit.codewriter.policy import JitPolicy
     return JitPolicy()
 
+@purefunction
+def get_op_val(program, pc):
+    return program[pc]
+
+@purefunction
+def get_req_size(program, pc):
+    return OP_REQSIZE[program[pc][0]]
+
 def mainloop(program, debug):
     pc = 0
     stacksize = 0
-    s = Storage()
+    storage = init_storage()
+    selected = storage[0]
     #debug.export()
     while pc < len(program):
         #debug.storage(s)
         #if DEBUG: raw_input()
         #debug.show(pc)
-        stacksize = min(OP_REQSIZE[program[pc][0]], len(s.selected))
-        jitdriver.jit_merge_point(pc=pc, stacksize=stacksize, program=program, storage=s)
-        op, value = program[pc]
+        stacksize = min(get_req_size(program, pc), len(selected))
+        jitdriver.jit_merge_point(pc=pc, stacksize=stacksize, program=program, storage=storage, selected=selected)
+        op, value = get_op_val(program, pc)
         if op == OP_ADD:
-            r1, r2 = s.selected.pop(), s.selected.pop()
-            s.selected.push(r2 + r1)
+            r1, r2 = selected.pop(), selected.pop()
+            selected.push(r2 + r1)
         elif op == OP_SUB:
-            r1, r2 = s.selected.pop(), s.selected.pop()
-            s.selected.push(r2 - r1)
+            r1, r2 = selected.pop(), selected.pop()
+            selected.push(r2 - r1)
         elif op == OP_MUL:
-            r1, r2 = s.selected.pop(), s.selected.pop()
-            s.selected.push(r2 * r1)
+            r1, r2 = selected.pop(), selected.pop()
+            selected.push(r2 * r1)
         elif op == OP_DIV:
-            r1, r2 = s.selected.pop(), s.selected.pop()
-            s.selected.push(r2 / r1)
+            r1, r2 = selected.pop(), selected.pop()
+            selected.push(r2 / r1)
         elif op == OP_MOD:
-            r1, r2 = s.selected.pop(), s.selected.pop()
-            s.selected.push(r2 % r1)
+            r1, r2 = selected.pop(), selected.pop()
+            selected.push(r2 % r1)
         elif op == OP_POP:
-            s.selected.pop()
+            selected.pop()
         elif op == OP_PUSH:
-            s.selected.push(value)
+            selected.push(value)
         elif op == OP_DUP:
-            s.selected.dup()
+            selected.dup()
         elif op == OP_SWAP:
-            s.selected.swap()
+            selected.swap()
         elif op == OP_SEL:
-            s.select(value)
+            selected = storage[value]
         elif op == OP_MOV:
-            r = s.selected.pop()
-            s.lists[value].push(r)
+            r = selected.pop()
+            storage[value].push(r)
         elif op == OP_CMP:
-            r1, r2 = s.selected.pop(), s.selected.pop()
+            r1, r2 = selected.pop(), selected.pop()
             r = 1 if r2 >= r1 else 0
-            s.selected.push(r)
+            selected.push(r)
         elif op == OP_BRZ:
-            r = s.selected.pop()
+            r = selected.pop()
             if r == 0:
                 pc = value
                 continue
         elif op == OP_BRPOP1:
-            if len(s.selected) < 1:
+            if len(selected) < 1:
                 pc = value
                 continue
         elif op == OP_BRPOP2:
-            if len(s.selected) < 2:
+            if len(selected) < 2:
                 pc = value
                 continue
         elif op == OP_POPNUM:
-            r = s.selected.pop()
+            r = selected.pop()
             os.write(1, str(r))
         elif op == OP_POPCHAR:
-            r = s.selected.pop()
+            r = selected.pop()
             os.write(1, unichr(r).encode('utf-8'))
         elif op == OP_PUSHNUM:
             numchars = []
@@ -456,7 +461,7 @@ def mainloop(program, debug):
                     numchars.append(numchar)
             assert len(numchars) > 0
             num = int(''.join(numchars))
-            s.selected.push(num)
+            selected.push(num)
         elif op == OP_PUSHCHAR:
             buf = os.read(0, 1)
             if buf:
@@ -479,9 +484,9 @@ def mainloop(program, debug):
                                 v = -1
                         else:
                             v = -1
-                s.selected.push(v)
+                selected.push(v)
             else:
-                s.selected.push(-1)
+                selected.push(-1)
         elif op == OP_JMP:
             pc = value
             continue
@@ -493,8 +498,9 @@ def mainloop(program, debug):
             os.write(2, 'Missing operator: %d' % op)
             assert False
         pc += 1
-    if len(s.selected) > 0:
-        return s.selected.pop()
+
+    if len(selected) > 0:
+        return selected.pop()
     else:
         return 0
 
