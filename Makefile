@@ -1,7 +1,7 @@
 
 RPYTHON=../pypy/rpython/bin/rpython
-#RPYTHONFLAGS=--opt=jit
-RPYTHONFLAGS=
+RPYTHONFLAGS=--opt=jit
+#RPYTHONFLAGS=
 
 build:
 	$(RPYTHON) $(RPYTHONFLAGS) aheui.py

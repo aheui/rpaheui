@@ -15,6 +15,7 @@ except ImportError:
         def jit_merge_point(self, **kw): pass
         def can_enter_jit(self, **kw): pass
     def purefunction(f): return f
+    def assert_green(x): pass
 
 
 def get_location(pc, stacksize, program):
@@ -52,6 +53,42 @@ class Stack(object):
     def __len__(self):
         return len(self.list)
 
+    def add(self):
+        r1 = self.pop()
+        r2 = self.pop()
+        r = r2 + r1
+        self.push(r)
+
+    def sub(self):
+        r1 = self.pop()
+        r2 = self.pop()
+        r = r2 - r1
+        self.push(r)
+
+    def mul(self):
+        r1 = self.pop()
+        r2 = self.pop()
+        r = r2 * r1
+        self.push(r)
+
+    def div(self):
+        r1 = self.pop()
+        r2 = self.pop()
+        r = r2 / r1
+        self.push(r)
+
+    def mod(self):
+        r1 = self.pop()
+        r2 = self.pop()
+        r = r2 % r1
+        self.push(r)
+
+    def cmp(self):
+        r1 = self.pop()
+        r2 = self.pop()
+        r = 1 if r2 >= r1 else 0
+        self.push(r)
+
 
 class Queue(Stack):
     def pop(self):
@@ -83,34 +120,67 @@ def get_op_val(program, pc):
 def get_req_size(program, pc):
     return OP_REQSIZE[program[pc][0]]
 
+
+def get_utf8():
+    buf = os.read(0, 1)
+    if buf:
+        v = ord(buf[0])
+        if v >= 0x80:
+            if (v & 0xf0) == 0xf0:
+                length = 4
+            elif (v & 0xe0) == 0xe0:
+                length = 3
+            elif (v & 0xc0) == 0xc0:
+                length = 2
+            else:
+                length = 0
+            if length > 0:
+                buf += os.read(0, length - 1)
+                if len(buf) == length:
+                    try:
+                        v = ord((buf).decode('utf-8')[0])
+                    except:
+                        v = -1
+                else:
+                    v = -1
+    else:
+         v = -1
+    return v
+
+def get_number():
+    numchars = []
+    while True:
+        numchar = os.read(0, 1)
+        if numchar not in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']:
+            break
+        else:
+            numchars.append(numchar)
+    assert len(numchars) > 0
+    num = int(''.join(numchars))
+    return num
+
+
 def mainloop(program, debug):
+    assert_green(program)
     pc = 0
     stacksize = 0
     storage = init_storage()
     selected = storage[0]
-    #debug.export()
     while pc < len(program):
-        #debug.storage(s)
-        #if DEBUG: raw_input()
         #debug.show(pc)
         stacksize = min(get_req_size(program, pc), len(selected))
         jitdriver.jit_merge_point(pc=pc, stacksize=stacksize, program=program, storage=storage, selected=selected)
         op, value = get_op_val(program, pc)
         if op == OP_ADD:
-            r1, r2 = selected.pop(), selected.pop()
-            selected.push(r2 + r1)
+            selected.add()
         elif op == OP_SUB:
-            r1, r2 = selected.pop(), selected.pop()
-            selected.push(r2 - r1)
+            selected.sub()
         elif op == OP_MUL:
-            r1, r2 = selected.pop(), selected.pop()
-            selected.push(r2 * r1)
+            selected.mul()
         elif op == OP_DIV:
-            r1, r2 = selected.pop(), selected.pop()
-            selected.push(r2 / r1)
+            selected.div()
         elif op == OP_MOD:
-            r1, r2 = selected.pop(), selected.pop()
-            selected.push(r2 % r1)
+            selected.mod()
         elif op == OP_POP:
             selected.pop()
         elif op == OP_PUSH:
@@ -125,9 +195,7 @@ def mainloop(program, debug):
             r = selected.pop()
             storage[value].push(r)
         elif op == OP_CMP:
-            r1, r2 = selected.pop(), selected.pop()
-            r = 1 if r2 >= r1 else 0
-            selected.push(r)
+            selected.cmp()
         elif op == OP_BRZ:
             r = selected.pop()
             if r == 0:
@@ -148,41 +216,11 @@ def mainloop(program, debug):
             r = selected.pop()
             os.write(1, unichr(r).encode('utf-8'))
         elif op == OP_PUSHNUM:
-            numchars = []
-            while True:
-                numchar = os.read(0, 1)
-                if numchar not in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']:
-                    break
-                else:
-                    numchars.append(numchar)
-            assert len(numchars) > 0
-            num = int(''.join(numchars))
+            num = get_number()
             selected.push(num)
         elif op == OP_PUSHCHAR:
-            buf = os.read(0, 1)
-            if buf:
-                v = ord(buf[0])
-                if v >= 0x80:
-                    if (v & 0xf0) == 0xf0:
-                        length = 4
-                    elif (v & 0xe0) == 0xe0:
-                        length = 3
-                    elif (v & 0xc0) == 0xc0:
-                        length = 2
-                    else:
-                        length = 0
-                    if length > 0:
-                        buf += os.read(0, length - 1)
-                        if len(buf) == length:
-                            try:
-                                v = ord((buf).decode('utf-8')[0])
-                            except:
-                                v = -1
-                        else:
-                            v = -1
-                selected.push(v)
-            else:
-                selected.push(-1)
+            c = get_utf8()
+            selected.push(c)
         elif op == OP_JMP:
             pc = value
             continue
@@ -237,6 +275,7 @@ def entry_point(argv):
             os.close(bfp)
         except:
             pass
+
     exitcode = mainloop(assembler.lines, assembler.debug)
     return exitcode
 
@@ -246,5 +285,4 @@ def target(*args):
 if __name__ == '__main__':
     import sys
     sys.exit(entry_point(sys.argv))
-
 
