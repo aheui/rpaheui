@@ -1,6 +1,6 @@
 
 import os
-import aheui
+import serializer
 
 def run(fp):
     program_contents = ''
@@ -10,7 +10,7 @@ def run(fp):
             break
         program_contents += read
     os.close(fp)
-    assembler = aheui.Assembler()
+    assembler = serializer.Serializer()
     assembler.compile(program_contents)
     assembler.export()
     return 0
