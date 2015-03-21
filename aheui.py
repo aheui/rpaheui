@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+
 import os
 
 from const import *
@@ -17,7 +18,7 @@ except ImportError:
 
 
 def get_location(pc, stacksize, program):
-    return "#%d_stack%d_%s_%d" % (pc, stacksize, serializer.OPCODE_NAMES[program[pc][0]], program[pc][1])
+    return "#%d(s%d)_%s_%d" % (pc, stacksize, serializer.OPCODE_NAMES[program[pc][0]], program[pc][1])
 
 jitdriver = JitDriver(greens=['pc', 'stacksize', 'program'], reds=['storage', 'selected'], get_printable_location=get_location)
 
@@ -199,27 +200,44 @@ def mainloop(program, debug):
     else:
         return 0
 
-import os
-def run(fp):
-    program_contents = ''
-    while True:
-        read = os.read(fp, 4096)
-        if len(read) == 0:
-            break
-        program_contents += read
-    os.close(fp)
-    assembler = serializer.Serializer()
-    assembler.compile(program_contents)
-    return mainloop(assembler.lines, assembler.debug)
-
 def entry_point(argv):
     try:
         filename = argv[1]
     except IndexError:
-        print 'filename'
+        print 'aheui: error: no input files'
         return 1
+    
+    assembler = serializer.Serializer()
     fp = os.open(filename, os.O_RDONLY, 0777)
-    exitcode = run(fp)
+    if filename.endswith('.aheuic'):
+        assembler.read(fp)
+        os.close(fp)
+    else:
+        program_contents = ''
+        while True:
+            read = os.read(fp, 4096)
+            if len(read) == 0:
+                break
+            program_contents += read
+        os.close(fp)
+            
+        assembler.compile(program_contents)
+        assembler.optimize()
+
+        binname = filename
+        if binname.endswith('.aheui'):
+            binname += 'c'
+        else:
+            binname += '.aheuic'
+        try:
+            bfp = os.open(binname, os.O_WRONLY|os.O_CREAT, 0644)
+            assembler.write(bfp)
+            os.write(bfp, '\n\n')
+            assembler.dump(bfp)
+            os.close(bfp)
+        except:
+            pass
+    exitcode = mainloop(assembler.lines, assembler.debug)
     return exitcode
 
 def target(*args):

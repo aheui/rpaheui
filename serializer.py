@@ -7,6 +7,7 @@ try:
 except ImportError:
     DEBUG = False
 
+import os
 from const import *
 try:
     from rpython.rlib.listsort import TimSort
@@ -67,23 +68,21 @@ class Debug(object):
             except:
                 self.inv_map[v] = [k]
 
-    def show(self, pc):
-        if not self.ENABLED: return
-
+    def show(self, pc, fp=2):
         op, value = self.serialized[pc]
         positions = self.inv_map.get(pc, [])
         if not positions:
-            os.write(2, 'No instruction information for pc %s\n' % pc)
+            os.write(fp, 'No instruction information for pc %s\n' % pc)
         for position in positions:
             char = self.primitive.pane[position[0]]
-            os.write(2, (u'%s %s(%s) %s # %s\n' % (char, OPCODE_NAMES[op], unichr(0x1100 + op), value, position)).encode('utf-8'))
+            os.write(fp, (u'%s %s(%s) %s # %s\n' % (char, OPCODE_NAMES[op], unichr(0x1100 + op), value, position)).encode('utf-8'))
 
-    def dump(self):
+    def dump(self, fp=2):
         keys = sorted(self.inv_map.keys())
         for k in keys:
             pos = self.inv_map[k]
             char = self.primitive.pane[pos[0][0]]
-            os.write(2, (u'%d %s\n' % (k, char)).encode('utf-8'))
+            os.write(fp, (u'%d %s\n' % (k, char)).encode('utf-8'))
 
     def storage(self, storage, selected=None):
         for i, l in enumerate(storage.lists):
@@ -216,7 +215,6 @@ class Serializer(object):
         code_map = {}
         self.serialize(primitive, code_map, (0, 0), DIR_DOWN)
         self.debug = Debug(primitive, self.lines, code_map)
-        self.optimize()
 
     def serialize(self, primitive, code_map, position, direction, depth=0):
         while True:
@@ -229,8 +227,12 @@ class Serializer(object):
 
             if (position, direction) in code_map:
                 index = code_map[position, direction]
-                code_map[position, direction + 10] = len(self.lines)
-                self.lines.append((OP_JMP, index))
+                posdir = position, direction + 10
+                code_map[position, direction + 20] = len(self.lines)
+                if posdir in code_map:
+                    self.lines.append((OP_JMP, code_map[posdir]))
+                else:
+                    self.lines.append((OP_JMP, index))
                 break
 
             code_map[position, direction] = len(self.lines)
@@ -289,7 +291,6 @@ class Serializer(object):
                             self.lines.append((op, -1))
                             if op == OP_HALT:
                                 break
-
             position = primitive.advance_position(position, direction, step)
 
     def debuglines(self, lines=[]):
@@ -307,15 +308,10 @@ class Serializer(object):
         enterable_points = []
         for l, (op, val) in enumerate(self.lines):
             if op in [OP_JMP, OP_BRZ, OP_BRPOP1, OP_BRPOP2]:
-                enterable_points.append(val)
+                if val not in enterable_points:
+                    enterable_points.append(val)
         enterable_points.append(len(self.lines))
-
         TimSort(enterable_points).sort()
-        len_e = len(enterable_points)
-        for i in xrange(0, len_e - 1):
-            for j in xrange(0, len_e - i - 1):
-                if enterable_points[j] > enterable_points[j+1]:
-                    enterable_points[j+1], enterable_points[j] = enterable_points[j], enterable_points[j+1]
 
         useless = []
         prev = 0
@@ -340,30 +336,79 @@ class Serializer(object):
                     stacksize += OP_STACKADD[op]
             prev = point
 
+        TimSort(useless).sort()
+        useless_map = [0] * len(self.lines)
+        count = 0
+        for i in range(0, len(self.lines)):
+            useless_map[i] = count
+            if i in useless:
+                count += 1
+
         new = []
         removed = 0
+        new_inv_map = {}
         for i, (op, val) in enumerate(self.lines):
             if i in useless:
                 continue
             if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
-                count = 0
-                for x in useless:
-                    if x < val:
-                        count += 1
-                new.append((op, val - count))
+                new.append((op, val - useless_map[val]))
             else:
                 new.append((op, val))
+            if i in self.debug.inv_map:
+                useless_count = useless_map[i]
+                new_inv_map[i - useless_count] = self.debug.inv_map[i]
 
         self.lines = new
+        self.inv_map = new_inv_map
 
-    def export(self):
+    def write(self, fp=1):
+        for op, val in self.lines:
+         
+            if val >= 0: 
+                p_val = chr(val & 0xff) + chr((val & 0xff00) >> 8) + chr((val & 0xff0000) >> 16)
+            else:
+                p_val = '\0\0\0'
+            if op < 0:
+                op = 256 + op
+            p_op = chr(op)
+            p = p_val + p_op
+            assert len(p) == 4
+            os.write(fp, p)
+        os.write(fp, '\xff\xff\xff\xff')
+
+
+    def read(self, fp=0):
+        self.debug = None
+        self.lines = []
+        while True:
+            buf = os.read(fp, 4)
+            assert len(buf) == 4
+            if buf == '\xff\xff\xff\xff':
+                break
+            val = ord(buf[0]) + (ord(buf[1]) << 8) + (ord(buf[2]) << 16)
+            op = ord(buf[3])
+            if op > 128:
+                op -= 256
+            self.lines.append((op, val))
+
+
+    def dump(self, fp=1):
         for i, (op, val) in enumerate(self.lines):
             code = OPCODE_NAMES[op]
             if code is None:
                 code = 'inst' + str(op)
             if val != -1:
-                print '%s %s; L%d' % (code, val, i)
+                code_val = '%s %s' % (code, val)
             else:
-                print '%s; L%d' % (code, i)
-
+                code_val = code
+            if self.debug and i in self.debug.inv_map:
+                debug_infos = []
+                for posdir in self.debug.inv_map[i]:
+                    position, direction = posdir
+                    syllable = self.debug.primitive.pane[position].encode('utf-8')
+                    debug_infos.append(' %s %s %d' % (syllable, position, direction))
+                debug_info = ''.join(debug_infos)
+            else:
+                debug_info = ''
+            os.write(fp, '%s\t; L%d%s\n' % (code_val, i, debug_info))
 

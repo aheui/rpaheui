@@ -12,6 +12,7 @@ def run(fp):
     os.close(fp)
     assembler = serializer.Serializer()
     assembler.compile(program_contents)
+    assembler.optimize()
     assembler.export()
     return 0
 
