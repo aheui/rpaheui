@@ -22,7 +22,9 @@ except ImportError:
 
 
 def get_location(pc, stackok, is_queue, program):
-    return "#%d(s%d)_%s_%d" % (pc, stackok, serializer.OPCODE_NAMES[program[pc][0]], program[pc][1])
+    op = program.get_op(pc)
+    val = program.get_value(pc)
+    return "#%d(s%d)_%s_%d" % (pc, stackok, serializer.OPCODE_NAMES[op], val)
 
 jitdriver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], virtualizables=['selected'], get_printable_location=get_location)
 
@@ -39,26 +41,28 @@ class Stack(object):
         self.pos = 0
 
     def push(self, value):
-        pos = hint(self.pos, promote=True)
-        #assert pos >= 0
+        pos = self.pos
+        assert pos >= 0
         self.list[pos] = value
         self.pos = pos + 1
 
     def pop(self):
-        pos = hint(self.pos, promote=True)
+        pos = self.pos
         new_pos = pos - 1
-        #assert new_pos >= 0
+        assert new_pos >= 0
         v = self.list[new_pos]
         self.pos = new_pos
         return v
 
     def dup(self):
-        pos = hint(self.pos, promote=True)
-        v = self.list[pos - 1]
+        pos = self.pos
+        last_pos = pos - 1
+        assert last_pos >= 0
+        v = self.list[last_pos]
         self.push(v)
 
     def swap(self):
-        pos = hint(self.pos, promote=True)
+        pos = self.pos
         self.list[pos - 2], self.list[pos - 1] = self.list[pos - 1], self.list[pos - 2]
 
     def __len__(self):
@@ -174,13 +178,28 @@ def get_number():
     return num
 
 
-@elidable
-def get_op_val(program, pc):
-    return program[pc]
 
-@elidable
-def get_req_size(program, pc):
-    return OP_REQSIZE[program[pc][0]]
+
+class Program(object):
+    _immutable_fields_ = ['opcodes[*]', 'values[*]', 'size']
+
+    def __init__(self, lines):
+        self.opcodes = [l[0] for l in lines]
+        self.values = [l[1] for l in lines]
+        self.size = len(lines)
+
+    @elidable
+    def get_op(self, pc):
+        return self.opcodes[pc]
+
+    @elidable
+    def get_value(self, pc):
+        return self.values[pc]
+
+    @elidable
+    def get_req_size(self, pc):
+        return OP_REQSIZE[self.get_op(pc)]
+
 
 
 def mainloop(program, debug):
@@ -190,13 +209,13 @@ def mainloop(program, debug):
     is_queue = False
     storage = init_storage()
     selected = storage[0]
-    while pc < len(program):
+    while pc < program.size:
         #debug.storage(storage, selected)
         #raw_input()
         #debug.show(pc)
-        stackok = get_req_size(program, pc) <= stacksize
+        stackok = program.get_req_size(pc) <= stacksize
         jitdriver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
-        op, value = get_op_val(program, pc)
+        op = program.get_op(pc)
         assert_green(op)
         stacksize += - OP_STACKDEL[op] + OP_STACKADD[op]
         if op == OP_ADD:
@@ -212,31 +231,37 @@ def mainloop(program, debug):
         elif op == OP_POP:
             selected.pop()
         elif op == OP_PUSH:
+            value = program.get_value(pc)
             selected.push(value)
         elif op == OP_DUP:
             selected.dup()
         elif op == OP_SWAP:
             selected.swap()
         elif op == OP_SEL:
+            value = program.get_value(pc)
             selected = storage[value]
             stacksize = len(selected)
             is_queue = value == VAL_QUEUE
         elif op == OP_MOV:
             r = selected.pop()
+            value = program.get_value(pc)
             storage[value].push(r)
         elif op == OP_CMP:
             selected.cmp()
         elif op == OP_BRZ:
             r = selected.pop()
             if r == 0:
+                value = program.get_value(pc)
                 pc = value
                 continue
         elif op == OP_BRPOP1:
             if not stackok:
+                value = program.get_value(pc)
                 pc = value
                 continue
         elif op == OP_BRPOP2:
             if not stackok:
+                value = program.get_value(pc)
                 pc = value
                 continue
         elif op == OP_POPNUM:
@@ -252,6 +277,7 @@ def mainloop(program, debug):
             c = get_utf8()
             selected.push(c)
         elif op == OP_JMP:
+            value = program.get_value(pc)
             pc = value
             continue
         elif op == OP_HALT:
@@ -306,7 +332,8 @@ def entry_point(argv):
         except:
             pass
 
-    exitcode = mainloop(assembler.lines, assembler.debug)
+    program = Program(assembler.lines)
+    exitcode = mainloop(program, assembler.debug)
     return exitcode
 
 def target(*args):
