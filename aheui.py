@@ -7,9 +7,11 @@ from const import *
 import serializer
 try:
     from rpython.rlib.jit import JitDriver
-    from rpython.rlib.jit import elidable, hint, unroll_safe, dont_look_inside
+    from rpython.rlib.jit import elidable, unroll_safe
     from rpython.rlib.jit import assert_green
+    from rpython.rlib.jit import set_param
 except ImportError:
+    """Python compatibility."""
     class JitDriver(object):
         def __init__(self, **kw): pass
         def jit_merge_point(self, **kw): pass
@@ -19,14 +21,20 @@ except ImportError:
     def unroll_safe(f): return f
     def hint(v, **kw): return v
     def assert_green(x): pass
+    def set_param(driver, name, value): pass
 
 
 def get_location(pc, stackok, is_queue, program):
+    """Add debug information.
+
+    PYPYLOG=jit-log-opt,jit-backend,jit-summary:<filename>
+    """
     op = program.get_op(pc)
     val = program.get_value(pc)
     return "#%d(s%d)_%s_%d" % (pc, stackok, serializer.OPCODE_NAMES[op], val)
 
-jitdriver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
+driver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
+set_param(driver, 'trace_limit', 100000)
 
 
 DEBUG = False
@@ -35,16 +43,22 @@ DEBUG = False
 class Stack(object):
 
     def __init__(self):
-        self = hint(self, fresh_virtualizable=True, access_directly=True)
-        self.list = [0] * 10000
+        self.size = 0x1000
+        self.list = [0] * self.size
         self.pos = 0
 
+    @unroll_safe
     def push(self, value):
         pos = self.pos
         #assert pos >= 0
         self.list[pos] = value
-        self.pos = pos + 1
+        new_pos = pos + 1
+        self.pos = new_pos
+        if new_pos >= self.size:
+            self.list += [0] * self.size
+            self.size = len(self.list)
 
+    @unroll_safe
     def pop(self):
         pos = self.pos
         new_pos = pos - 1
@@ -53,6 +67,7 @@ class Stack(object):
         self.pos = new_pos
         return v
 
+    @unroll_safe
     def dup(self):
         pos = self.pos
         last_pos = pos - 1
@@ -60,43 +75,51 @@ class Stack(object):
         v = self.list[last_pos]
         self.push(v)
 
+    @unroll_safe
     def swap(self):
         pos = self.pos
         self.list[pos - 2], self.list[pos - 1] = self.list[pos - 1], self.list[pos - 2]
 
+    @unroll_safe
     def __len__(self):
         return self.pos
 
+    @unroll_safe
     def add(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 + r1
         self.push(r)
 
+    @unroll_safe
     def sub(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 - r1
         self.push(r)
 
+    @unroll_safe
     def mul(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 * r1
         self.push(r)
 
+    @unroll_safe
     def div(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 / r1
         self.push(r)
 
+    @unroll_safe
     def mod(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 % r1
         self.push(r)
 
+    @unroll_safe
     def cmp(self):
         r1 = self.pop()
         r2 = self.pop()
@@ -107,25 +130,28 @@ class Stack(object):
 class Queue(Stack):
 
     def __init__(self):
-        self = hint(self, fresh_virtualizable=True, access_directly=True)
         self.list = []
         self.pos = 0
 
+    @unroll_safe
     def push(self, value):
         self.list.append(value)
         self.pos += 1
 
+    @unroll_safe
     def pop(self):
         v = self.list.pop(0)
         self.pos -= 1
         return v
 
+    @unroll_safe
     def swap(self):
         l = self.list
         l[0], l[1] = l[1], l[0]
 
 
 def init_storage():
+    """Initialize stacks and a queue for program."""
     storage = []
     for i in range(0, 28):
         if i == VAL_QUEUE:
@@ -134,11 +160,15 @@ def init_storage():
             storage.append(Stack())
     return storage
 
-def jitpolicy(driver):
-    from rpython.jit.codewriter.policy import JitPolicy
-    return JitPolicy()
 
 def get_utf8():
+    """Get a utf-8 character from standard input.
+
+    The length of utf-8 character is detectable in first byte.
+    If decode fails, it means it is a broken character.
+    Non-utf-8 character input is undefined in aheui.
+    Let's put -1 in this implementaion.
+    """
     buf = os.read(0, 1)
     if buf:
         v = ord(buf[0])
@@ -165,6 +195,7 @@ def get_utf8():
     return v
 
 def get_number():
+    """Get a number from standard input."""
     numchars = []
     while True:
         numchar = os.read(0, 1)
@@ -175,7 +206,6 @@ def get_number():
     assert len(numchars) > 0
     num = int(''.join(numchars))
     return num
-
 
 
 
@@ -213,7 +243,7 @@ def mainloop(program, debug):
         #raw_input()
         #debug.show(pc)
         stackok = program.get_req_size(pc) <= stacksize
-        jitdriver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
+        driver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
         op = program.get_op(pc)
         #assert_green(op)
         stacksize += - OP_STACKDEL[op] + OP_STACKADD[op]
@@ -252,16 +282,22 @@ def mainloop(program, debug):
             if r == 0:
                 value = program.get_value(pc)
                 pc = value
+                stackok = program.get_req_size(pc) <= stacksize
+                driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == OP_BRPOP1:
             if not stackok:
                 value = program.get_value(pc)
                 pc = value
+                stackok = program.get_req_size(pc) <= stacksize
+                driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == OP_BRPOP2:
             if not stackok:
                 value = program.get_value(pc)
                 pc = value
+                stackok = program.get_req_size(pc) <= stacksize
+                driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == OP_POPNUM:
             r = selected.pop()
@@ -278,6 +314,8 @@ def mainloop(program, debug):
         elif op == OP_JMP:
             value = program.get_value(pc)
             pc = value
+            stackok = program.get_req_size(pc) <= stacksize
+            driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
             continue
         elif op == OP_HALT:
             break
@@ -335,10 +373,16 @@ def entry_point(argv):
     exitcode = mainloop(program, assembler.debug)
     return exitcode
 
+
+def jitpolicy(driver):
+    from rpython.jit.codewriter.policy import JitPolicy
+    return JitPolicy()
+
 def target(*args):
     return entry_point, None
 
 if __name__ == '__main__':
+    """Python compatibility."""
     import sys
     sys.exit(entry_point(sys.argv))
 
