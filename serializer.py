@@ -293,62 +293,60 @@ class Serializer(object):
                                 break
             position = primitive.advance_position(position, direction, step)
 
-    def debuglines(self, lines=[]):
-        if not lines:
-            lines = self.lines
-        print '------'
-        for i, (op, val) in enumerate(lines):
-            print i, OPCODE_NAMES[op], val
-        print '------'
+    def optimize_(self, pc, stacksize, reachability):
+        while pc < len(self.lines):
+            assert stacksize >= 0
+            op, val = self.lines[pc]
+            if reachability[pc] >= 0:
+                if reachability[pc] <= stacksize:
+                    break
+            if op == OP_BRPOP1 or op == OP_BRPOP2:
+                reqsize = OP_REQSIZE[op]
+                if stacksize >= reqsize:
+                    pc += 1
+                    continue
+                else:
+                    reachability[pc] = stacksize
+                    self.optimize_(pc + 1, stacksize, reachability)
+                    self.optimize_(val, stacksize, reachability)
+                    break
+            elif op == OP_BRZ:
+                stacksize -= 1
+                if stacksize < 0: stacksize = 0
+                reachability[pc] = stacksize
+                self.optimize_(pc + 1, stacksize, reachability)
+                self.optimize_(val, stacksize, reachability)
+                break
+            elif op == OP_JMP:
+                reachability[pc] = stacksize
+                pc = val
+            else:
+                reachability[pc] = stacksize
+                stacksize -= OP_STACKDEL[op]
+                if stacksize < 0: stacksize = 0
+                stacksize += OP_STACKADD[op]
+                pc += 1
+                if op == OP_SEL:
+                    stacksize = 0
+                elif op == OP_HALT:
+                    break
 
     def optimize(self):
-        OP_STACKDEL = [0, 0, 2, 2, 2, 2, 1, 0, 1,-1, 1, 0, 2, 0, 1, 0, 2, 2, 0, 1, 1, 0, 0, 0, 0, 0]
-        OP_STACKADD = [0, 0, 1, 1, 1, 1, 0, 1, 2, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 0, 0, 1, 1, 0, 0, 0]
+        reachability = [-1] * len(self.lines)
+        self.optimize_(0, 0, reachability)
 
-        enterable_points = []
-        for l, (op, val) in enumerate(self.lines):
-            if op in [OP_JMP, OP_BRZ, OP_BRPOP1, OP_BRPOP2]:
-                if val not in enterable_points:
-                    enterable_points.append(val)
-        enterable_points.append(len(self.lines))
-        TimSort(enterable_points).sort()
-
-        useless = []
-        prev = 0
-        for point in enterable_points:
-            stacksize = 0
-            last_op = OP_NONE
-            for i in xrange(prev, point - 1):
-                op, val = self.lines[i]
-                if op in [OP_SEL, OP_JMP]:
-                    stacksize = 0
-                    continue
-                elif op == OP_BRPOP1:
-                    if stacksize >= 1:
-                        useless.append(i)
-                elif op == OP_BRPOP2:
-                    if stacksize >= 2:
-                        useless.append(i)
-                else:
-                    stacksize -= OP_STACKDEL[op]
-                    if stacksize < 0:
-                        stacksize = 0
-                    stacksize += OP_STACKADD[op]
-            prev = point
-
-        TimSort(useless).sort()
         useless_map = [0] * len(self.lines)
         count = 0
-        for i in range(0, len(self.lines)):
+        for i, able in enumerate(reachability):
             useless_map[i] = count
-            if i in useless:
+            if able < 0:
                 count += 1
-
+        
         new = []
         removed = 0
         new_inv_map = {}
         for i, (op, val) in enumerate(self.lines):
-            if i in useless:
+            if reachability[i] < 0:
                 continue
             if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
                 new.append((op, val - useless_map[val]))

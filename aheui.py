@@ -7,21 +7,21 @@ from const import *
 import serializer
 try:
     from rpython.rlib.jit import JitDriver
-    from rpython.rlib.jit import purefunction
+    from rpython.rlib.jit import elidable, hint, unroll_safe
     from rpython.rlib.jit import assert_green
 except ImportError:
     class JitDriver(object):
         def __init__(self, **kw): pass
         def jit_merge_point(self, **kw): pass
         def can_enter_jit(self, **kw): pass
-    def purefunction(f): return f
+    def elidable(f): return f
     def assert_green(x): pass
 
 
-def get_location(pc, stacksize, program):
-    return "#%d(s%d)_%s_%d" % (pc, stacksize, serializer.OPCODE_NAMES[program[pc][0]], program[pc][1])
+def get_location(pc, stackok, is_queue, program):
+    return "#%d(s%d)_%s_%d" % (pc, stackok, serializer.OPCODE_NAMES[program[pc][0]], program[pc][1])
 
-jitdriver = JitDriver(greens=['pc', 'stacksize', 'program'], reds=['storage', 'selected'], get_printable_location=get_location)
+jitdriver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
 
 
 DEBUG = False
@@ -112,15 +112,6 @@ def jitpolicy(driver):
     from rpython.jit.codewriter.policy import JitPolicy
     return JitPolicy()
 
-@purefunction
-def get_op_val(program, pc):
-    return program[pc]
-
-@purefunction
-def get_req_size(program, pc):
-    return OP_REQSIZE[program[pc][0]]
-
-
 def get_utf8():
     buf = os.read(0, 1)
     if buf:
@@ -160,17 +151,29 @@ def get_number():
     return num
 
 
+@elidable
+def get_op_val(program, pc):
+    return program[pc]
+
+@elidable
+def get_req_size(program, pc):
+    return OP_REQSIZE[program[pc][0]]
+
+
 def mainloop(program, debug):
     assert_green(program)
     pc = 0
     stacksize = 0
+    is_queue = False
     storage = init_storage()
     selected = storage[0]
     while pc < len(program):
         #debug.show(pc)
-        stacksize = min(get_req_size(program, pc), len(selected))
-        jitdriver.jit_merge_point(pc=pc, stacksize=stacksize, program=program, storage=storage, selected=selected)
+        stackok = get_req_size(program, pc) <= stacksize
+        jitdriver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
         op, value = get_op_val(program, pc)
+        assert_green(op)
+        stacksize += - OP_STACKDEL[op] + OP_STACKADD[op]
         if op == OP_ADD:
             selected.add()
         elif op == OP_SUB:
@@ -191,6 +194,8 @@ def mainloop(program, debug):
             selected.swap()
         elif op == OP_SEL:
             selected = storage[value]
+            stacksize = len(selected)
+            is_queue = value == VAL_QUEUE
         elif op == OP_MOV:
             r = selected.pop()
             storage[value].push(r)
@@ -202,11 +207,11 @@ def mainloop(program, debug):
                 pc = value
                 continue
         elif op == OP_BRPOP1:
-            if len(selected) < 1:
+            if not stackok:
                 pc = value
                 continue
         elif op == OP_BRPOP2:
-            if len(selected) < 2:
+            if not stackok:
                 pc = value
                 continue
         elif op == OP_POPNUM:

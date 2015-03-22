@@ -13,7 +13,7 @@ def run(fp):
     assembler = serializer.Serializer()
     assembler.compile(program_contents)
     assembler.optimize()
-    assembler.export()
+    assembler.dump()
     return 0
 
 def entry_point(argv):
