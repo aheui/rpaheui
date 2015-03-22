@@ -72,10 +72,10 @@ class Debug(object):
         op, value = self.serialized[pc]
         positions = self.inv_map.get(pc, [])
         if not positions:
-            os.write(fp, 'No instruction information for pc %s\n' % pc)
+            os.write(fp, (u'%d X %s(%s) %s\n' % (pc, OPCODE_NAMES[op], unichr(0x1100 + op), value)).encode('utf-8'))
         for position in positions:
             char = self.primitive.pane[position[0]]
-            os.write(fp, (u'%s %s(%s) %s # %s\n' % (char, OPCODE_NAMES[op], unichr(0x1100 + op), value, position)).encode('utf-8'))
+            os.write(fp, (u'%d %s %s(%s) %s # %s\n' % (pc, char, OPCODE_NAMES[op], unichr(0x1100 + op), value, position)).encode('utf-8'))
 
     def dump(self, fp=2):
         keys = sorted(self.inv_map.keys())
@@ -85,10 +85,10 @@ class Debug(object):
             os.write(fp, (u'%d %s\n' % (k, char)).encode('utf-8'))
 
     def storage(self, storage, selected=None):
-        for i, l in enumerate(storage.lists):
+        for i, l in enumerate(storage):
             marker = u':' if l == selected else u' '
             os.write(2, (u'%s (%d):%s' % (unichr(0x11a8 + i - 1), i, marker)).encode('utf-8'))
-            os.write(2, ('%s\n' % l.list))
+            os.write(2, ('%s\n' % l.list[:l.pos]))
 
 
 class PrimitiveProgram(object):
@@ -344,7 +344,7 @@ class Serializer(object):
         
         new = []
         removed = 0
-        new_inv_map = {}
+        code_map = {}
         for i, (op, val) in enumerate(self.lines):
             if reachability[i] < 0:
                 continue
@@ -353,11 +353,15 @@ class Serializer(object):
             else:
                 new.append((op, val))
             if i in self.debug.inv_map:
+                keys = self.debug.inv_map[i]
                 useless_count = useless_map[i]
-                new_inv_map[i - useless_count] = self.debug.inv_map[i]
+                for key in keys:
+                    code_map[key] = i - useless_count
 
+
+        new_debug = Debug(self.debug.primitive, new, code_map) # wrong
         self.lines = new
-        self.inv_map = new_inv_map
+        self.debug = new_debug
 
     def write(self, fp=1):
         for op, val in self.lines:

@@ -15,85 +15,85 @@ except ImportError:
         def jit_merge_point(self, **kw): pass
         def can_enter_jit(self, **kw): pass
     def elidable(f): return f
+    def dont_look_inside(f): return f
+    def unroll_safe(f): return f
+    def hint(v, **kw): return v
     def assert_green(x): pass
 
 
 def get_location(pc, stackok, is_queue, program):
     return "#%d(s%d)_%s_%d" % (pc, stackok, serializer.OPCODE_NAMES[program[pc][0]], program[pc][1])
 
-jitdriver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
+jitdriver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], virtualizables=['selected'], get_printable_location=get_location)
 
 
 DEBUG = False
 
 
-
 class Stack(object):
+    _virtualizable_ = ['pos']
+
     def __init__(self):
-        self.list = []
+        self = hint(self, fresh_virtualizable=True, access_directly=True)
+        self.list = [0] * 10000
+        self.pos = 0
 
-    @dont_look_inside
     def push(self, value):
-        assert value is not None
-        self.list.append(value)
+        pos = hint(self.pos, promote=True)
+        #assert pos >= 0
+        self.list[pos] = value
+        self.pos = pos + 1
 
-    @dont_look_inside
     def pop(self):
-        return self.list.pop()
+        pos = hint(self.pos, promote=True)
+        new_pos = pos - 1
+        #assert new_pos >= 0
+        v = self.list[new_pos]
+        self.pos = new_pos
+        return v
 
-    @dont_look_inside
     def dup(self):
-        last = self.list[-1]
-        self.push(last)
+        pos = hint(self.pos, promote=True)
+        v = self.list[pos - 1]
+        self.push(v)
 
-    @dont_look_inside
     def swap(self):
-        l = self.list
-        l[-1], l[-2] = l[-2], l[-1]
-
-    @dont_look_inside
-    def last(self):
-        return self.list[-1]
+        pos = hint(self.pos, promote=True)
+        self.list[pos - 2], self.list[pos - 1] = self.list[pos - 1], self.list[pos - 2]
 
     def __len__(self):
-        return len(self.list)
+        return self.pos
 
-    @dont_look_inside
     def add(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 + r1
         self.push(r)
 
-    @dont_look_inside
     def sub(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 - r1
         self.push(r)
 
-    @dont_look_inside
     def mul(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 * r1
         self.push(r)
 
-    @dont_look_inside
     def div(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 / r1
         self.push(r)
 
-    @dont_look_inside
     def mod(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 % r1
         self.push(r)
 
-    @dont_look_inside
     def cmp(self):
         r1 = self.pop()
         r2 = self.pop()
@@ -102,8 +102,20 @@ class Stack(object):
 
 
 class Queue(Stack):
+
+    def __init__(self):
+        self = hint(self, fresh_virtualizable=True, access_directly=True)
+        self.list = []
+        self.pos = 0
+
+    def push(self, value):
+        self.list.append(value)
+        self.pos += 1
+
     def pop(self):
-        return self.list.pop(0)
+        v = self.list.pop(0)
+        self.pos -= 1
+        return v
 
     def swap(self):
         l = self.list
@@ -179,6 +191,8 @@ def mainloop(program, debug):
     storage = init_storage()
     selected = storage[0]
     while pc < len(program):
+        #debug.storage(storage, selected)
+        #raw_input()
         #debug.show(pc)
         stackok = get_req_size(program, pc) <= stacksize
         jitdriver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
