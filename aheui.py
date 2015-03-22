@@ -26,14 +26,13 @@ def get_location(pc, stackok, is_queue, program):
     val = program.get_value(pc)
     return "#%d(s%d)_%s_%d" % (pc, stackok, serializer.OPCODE_NAMES[op], val)
 
-jitdriver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], virtualizables=['selected'], get_printable_location=get_location)
+jitdriver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
 
 
 DEBUG = False
 
 
 class Stack(object):
-    _virtualizable_ = ['pos']
 
     def __init__(self):
         self = hint(self, fresh_virtualizable=True, access_directly=True)
@@ -42,14 +41,14 @@ class Stack(object):
 
     def push(self, value):
         pos = self.pos
-        assert pos >= 0
+        #assert pos >= 0
         self.list[pos] = value
         self.pos = pos + 1
 
     def pop(self):
         pos = self.pos
         new_pos = pos - 1
-        assert new_pos >= 0
+        #assert new_pos >= 0
         v = self.list[new_pos]
         self.pos = new_pos
         return v
@@ -57,7 +56,7 @@ class Stack(object):
     def dup(self):
         pos = self.pos
         last_pos = pos - 1
-        assert last_pos >= 0
+        #assert last_pos >= 0
         v = self.list[last_pos]
         self.push(v)
 
@@ -216,7 +215,7 @@ def mainloop(program, debug):
         stackok = program.get_req_size(pc) <= stacksize
         jitdriver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
         op = program.get_op(pc)
-        assert_green(op)
+        #assert_green(op)
         stacksize += - OP_STACKDEL[op] + OP_STACKADD[op]
         if op == OP_ADD:
             selected.add()
