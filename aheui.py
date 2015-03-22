@@ -7,7 +7,7 @@ from const import *
 import serializer
 try:
     from rpython.rlib.jit import JitDriver
-    from rpython.rlib.jit import elidable, hint, unroll_safe
+    from rpython.rlib.jit import elidable, hint, unroll_safe, dont_look_inside
     from rpython.rlib.jit import assert_green
 except ImportError:
     class JitDriver(object):
@@ -32,57 +32,68 @@ class Stack(object):
     def __init__(self):
         self.list = []
 
+    @dont_look_inside
     def push(self, value):
         assert value is not None
         self.list.append(value)
 
+    @dont_look_inside
     def pop(self):
         return self.list.pop()
 
+    @dont_look_inside
     def dup(self):
         last = self.list[-1]
         self.push(last)
 
+    @dont_look_inside
     def swap(self):
         l = self.list
         l[-1], l[-2] = l[-2], l[-1]
 
+    @dont_look_inside
     def last(self):
         return self.list[-1]
 
     def __len__(self):
         return len(self.list)
 
+    @dont_look_inside
     def add(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 + r1
         self.push(r)
 
+    @dont_look_inside
     def sub(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 - r1
         self.push(r)
 
+    @dont_look_inside
     def mul(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 * r1
         self.push(r)
 
+    @dont_look_inside
     def div(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 / r1
         self.push(r)
 
+    @dont_look_inside
     def mod(self):
         r1 = self.pop()
         r2 = self.pop()
         r = r2 % r1
         self.push(r)
 
+    @dont_look_inside
     def cmp(self):
         r1 = self.pop()
         r2 = self.pop()
