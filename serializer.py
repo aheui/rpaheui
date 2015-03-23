@@ -20,7 +20,7 @@ except ImportError:
             self.list.sort()
 
 
-OPCODE_NAMES = [None, None, 'div', 'add', 'mul', 'mod', 'pop', 'push', 'dup', 'sel', 'mov', None, 'cmp', None, 'brz', None, 'sub', 'swap', 'halt', 'popnum', 'popchar', 'pushnum', 'pushchar', 'brpop2', 'brpop1', 'jmp']
+OPCODE_NAMES = [None, None, 'DIV', 'ADD', 'MUL', 'MOD', 'POP', 'PUSH', 'DUP', 'SEL', 'MOV', None, 'CMP', None, 'BRZ', None, 'SUB', 'SWAP', 'HALT', 'POPNUM', 'POPCHAR', 'PUSHNUM', 'PUSHCHAR', 'BRPOP2', 'BRPOP1', 'JMP']
 
 OP_HASOP = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 OP_USEVAL = [0, 0, 0, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
@@ -221,10 +221,11 @@ class Serializer(object):
         primitive = PrimitiveProgram(program)
 
         code_map = {}
-        self.serialize(primitive, code_map, (0, 0), DIR_DOWN)
+        label_map = {}
+        self.serialize(primitive, code_map, label_map, (0, 0), DIR_DOWN)
         self.debug = Debug(primitive, self.lines, code_map)
 
-    def serialize(self, primitive, code_map, position, direction, depth=0):
+    def serialize(self, primitive, code_map, label_map, position, direction, depth=0):
         while True:
             if not position in primitive.pane:
                 position = primitive.advance_position(position, direction)
@@ -238,9 +239,10 @@ class Serializer(object):
                 posdir = position, direction + 10
                 code_map[position, direction + 20] = len(self.lines)
                 if posdir in code_map:
-                    self.lines.append((OP_JMP, code_map[posdir]))
+                    target = code_map[posdir]
                 else:
-                    self.lines.append((OP_JMP, index))
+                    target = index
+                self.lines.append((OP_JMP, target))
                 break
 
             code_map[position, direction] = len(self.lines)
@@ -271,10 +273,10 @@ class Serializer(object):
                     code_map[position, direction + 10] = idx
                     self.lines.append((OP_BRZ, -1))
                     position1 = primitive.advance_position(position, direction, step)
-                    self.serialize(primitive, code_map, position1, direction, depth + 1)
+                    self.serialize(primitive, code_map, label_map, position1, direction, depth + 1)
                     self.lines[idx] = OP_BRZ, len(self.lines)
                     position2 = primitive.advance_position(position, -direction, step)
-                    self.serialize(primitive, code_map, position2, -direction, depth + 1)
+                    self.serialize(primitive, code_map, label_map, position2, -direction, depth + 1)
                 else:
                     req_size = OP_REQSIZE[op]
                     if req_size > 0:
@@ -288,10 +290,10 @@ class Serializer(object):
                         else:
                             self.lines.append((op, -1))
                         position1 = primitive.advance_position(position, direction, step)
-                        self.serialize(primitive, code_map, position1, direction, depth + 1)
+                        self.serialize(primitive, code_map, label_map, position1, direction, depth + 1)
                         self.lines[idx] = brop, len(self.lines)
                         position2 = primitive.advance_position(position, -direction, step)
-                        self.serialize(primitive, code_map, position2, -direction, depth + 1)
+                        self.serialize(primitive, code_map, label_map, position2, -direction, depth + 1)
                     else:
                         if OP_USEVAL[op]:
                             self.lines.append((op, val))
@@ -301,47 +303,50 @@ class Serializer(object):
                                 break
             position = primitive.advance_position(position, direction, step)
 
-    def optimize_(self, pc, stacksize, reachability):
-        while pc < len(self.lines):
-            assert stacksize >= 0
-            op, val = self.lines[pc]
-            if reachability[pc] >= 0:
-                if reachability[pc] <= stacksize:
+    def optimize_reachability(self, pc, stacksize, reachability):
+        queue = [(pc, stacksize)]
+        while len(queue) > 0:
+            pc, stacksize = queue.pop(0) 
+            while pc < len(self.lines):
+                assert stacksize >= 0
+                op, val = self.lines[pc]
+                if reachability[pc] >= 0:
+                    if reachability[pc] <= stacksize:
+                        break
+                if op == OP_BRPOP1 or op == OP_BRPOP2:
+                    reqsize = OP_REQSIZE[op]
+                    if stacksize >= reqsize:
+                        pc += 1
+                        continue
+                    else:
+                        reachability[pc] = stacksize
+                        queue.append((pc + 1, stacksize))
+                        queue.append((val, stacksize))
+                        break
+                elif op == OP_BRZ:
+                    stacksize -= 1
+                    if stacksize < 0: stacksize = 0
+                    reachability[pc] = stacksize
+                    queue.append((pc + 1, stacksize))
+                    queue.append((val, stacksize))
                     break
-            if op == OP_BRPOP1 or op == OP_BRPOP2:
-                reqsize = OP_REQSIZE[op]
-                if stacksize >= reqsize:
-                    pc += 1
-                    continue
+                elif op == OP_JMP:
+                    reachability[pc] = stacksize
+                    pc = val
                 else:
                     reachability[pc] = stacksize
-                    self.optimize_(pc + 1, stacksize, reachability)
-                    self.optimize_(val, stacksize, reachability)
-                    break
-            elif op == OP_BRZ:
-                stacksize -= 1
-                if stacksize < 0: stacksize = 0
-                reachability[pc] = stacksize
-                self.optimize_(pc + 1, stacksize, reachability)
-                self.optimize_(val, stacksize, reachability)
-                break
-            elif op == OP_JMP:
-                reachability[pc] = stacksize
-                pc = val
-            else:
-                reachability[pc] = stacksize
-                stacksize -= OP_STACKDEL[op]
-                if stacksize < 0: stacksize = 0
-                stacksize += OP_STACKADD[op]
-                pc += 1
-                if op == OP_SEL:
-                    stacksize = 0
-                elif op == OP_HALT:
-                    break
+                    stacksize -= OP_STACKDEL[op]
+                    if stacksize < 0: stacksize = 0
+                    stacksize += OP_STACKADD[op]
+                    pc += 1
+                    if op == OP_SEL:
+                        stacksize = 0
+                    elif op == OP_HALT:
+                        break
 
     def optimize(self):
         reachability = [-1] * len(self.lines)
-        self.optimize_(0, 0, reachability)
+        self.optimize_reachability(0, 0, reachability)
 
         useless_map = [0] * len(self.lines)
         count = 0

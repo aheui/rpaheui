@@ -56,33 +56,33 @@ class Stack(object):
         self.size = 0
 
     def push(self, value):
-        node = Link(self.head, value)
+        node = Link(self.head.next, value)
+        self.head.next = node
         self.size += 1
-        self.head = node
 
     def pop(self):
-        node = self.head
+        node = self.head.next
         value = node.value
         self.size -= 1
-        self.head = node.next
+        self.head.next = node.next
         del node
         return value
 
     def dup(self):
-        self.push(self.head.value)
+        self.push(self.head.next.value)
 
     def swap(self):
-        node1 = self.head
+        node1 = self.head.next
         node2 = node1.next
         node1.value, node2.value = node2.value, node1.value
 
     # Tools for common methods. inline?
 
     def get_2_values(self):
-        return self.pop(), self.head.value
+        return self.pop(), self.head.next.value
 
     def put_value(self, value):
-        self.head.value = value
+        self.head.next.value = value
 
     # Common methods from here
 
@@ -134,22 +134,6 @@ class Queue(Stack):
         tail.next = new
         self.tail = new
         self.size += 1
-
-    def pop(self):
-        node = self.head.next
-        value = node.value
-        self.size -= 1
-        self.head.next = node.next
-        del node
-        return value
-
-    def dup(self):
-        self.push(self.head.next.value)
-
-    def swap(self):
-        node1 = self.head.next
-        node2 = node1.next
-        node1.value, node2.value = node2.value, node1.value
 
     def get_2_values(self):
         return self.pop(), self.pop()
@@ -242,7 +226,7 @@ class Program(object):
 
 
 def mainloop(program, debug):
-    #set_param(None, 'trace_limit', 50000)
+    set_param(None, 'trace_limit', 50000)
     assert_green(program)
     pc = 0
     stacksize = 0
