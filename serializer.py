@@ -221,96 +221,102 @@ class Serializer(object):
         """Compile to aheui-assembly representation."""
         primitive = PrimitiveProgram(program)
 
-        self.lines = []
-        self.label_map = {}
-        code_map = {}
-        self.serialize(primitive, code_map, (0, 0), DIR_DOWN)
+        self.lines, self.label_map, code_map = self.serialize(primitive)
         self.debug = Debug(primitive, self.lines, code_map)
 
-    def serialize(self, primitive, code_map, position, direction, depth=0):
-        while True:
-            if not position in primitive.pane:
-                position = primitive.advance_position(position, direction)
-                continue
+    def serialize(self, primitive):
+        job_queue = [((0, 0), DIR_DOWN, -1)]
 
-            op, mv, val = primitive.decode(position)
-            new_direction, step = dir_from_mv(mv, direction)
+        lines = []
+        label_map = {}
+        code_map = {}
+        while job_queue:
+            position, direction, marker = job_queue.pop()
+            if marker >= 0:
+                label_map[marker] = len(lines)
+            while True:
+                if not position in primitive.pane:
+                    position = primitive.advance_position(position, direction)
+                    continue
 
-            if (position, direction) in code_map:
-                index = code_map[position, direction]
-                posdir = position, direction + 10
-                code_map[position, direction + 20] = len(self.lines)
-                if posdir in code_map:
-                    target = code_map[posdir]
-                else:
-                    target = index
-                label_id = len(self.lines)
-                self.label_map[label_id] = target
-                self.lines.append((OP_JMP, label_id))
-                break
+                op, mv, val = primitive.decode(position)
+                new_direction, step = dir_from_mv(mv, direction)
 
-            code_map[position, direction] = len(self.lines)
+                if (position, direction) in code_map:
+                    index = code_map[position, direction]
+                    posdir = position, direction + 10
+                    code_map[position, direction + 20] = len(lines)
+                    if posdir in code_map:
+                        target = code_map[posdir]
+                    else:
+                        target = index
+                    label_id = len(lines)
+                    label_map[label_id] = target
+                    lines.append((OP_JMP, label_id))
+                    break
 
-            direction = new_direction
-            if OP_HASOP[op]:
-                if op == OP_POP:
-                    if val == VAL_NUMBER:
-                        op = OP_POPNUM
-                    elif val == VAL_UNICODE:
-                        op = OP_POPCHAR
+                code_map[position, direction] = len(lines)
+
+                direction = new_direction
+                if OP_HASOP[op]:
+                    if op == OP_POP:
+                        if val == VAL_NUMBER:
+                            op = OP_POPNUM
+                        elif val == VAL_UNICODE:
+                            op = OP_POPCHAR
+                        else:
+                            pass
+                    elif op == OP_PUSH:
+                        if val == VAL_NUMBER:
+                            op = OP_PUSHNUM
+                        elif val == VAL_UNICODE:
+                            op = OP_PUSHCHAR
+                        else:
+                            pass
                     else:
                         pass
-                elif op == OP_PUSH:
-                    if val == VAL_NUMBER:
-                        op = OP_PUSHNUM
-                    elif val == VAL_UNICODE:
-                        op = OP_PUSHCHAR
-                    else:
-                        pass
-                else:
-                    pass
 
-                if op == OP_PUSH:
-                    self.lines.append((op, VAL_CONSTS[val]))
-                elif op == OP_BRZ:
-                    idx = len(self.lines)
-                    code_map[position, direction + 10] = idx
-                    self.lines.append((OP_BRZ, idx))
-                    position1 = primitive.advance_position(position, direction, step)
-                    self.serialize(primitive, code_map, position1, direction, depth + 1)
-                    self.label_map[idx] = len(self.lines)
-                    position2 = primitive.advance_position(position, -direction, step)
-                    self.serialize(primitive, code_map, position2, -direction, depth + 1)
-                else:
-                    req_size = OP_REQSIZE[op]
-                    if req_size > 0:
-                        brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
-                        idx = len(self.lines)
+                    if op == OP_PUSH:
+                        lines.append((op, VAL_CONSTS[val]))
+                    elif op == OP_BRZ:
+                        idx = len(lines)
                         code_map[position, direction + 10] = idx
-                        code_map[position, direction] = idx + 1
-                        self.lines.append((brop, idx))
-                        if OP_USEVAL[op]:
-                            self.lines.append((op, val))
-                        else:
-                            self.lines.append((op, -1))
+                        lines.append((OP_BRZ, idx))
                         position1 = primitive.advance_position(position, direction, step)
-                        self.serialize(primitive, code_map, position1, direction, depth + 1)
-                        self.label_map[idx] = len(self.lines)
+                        job_queue.append((position1, direction, -1))
                         position2 = primitive.advance_position(position, -direction, step)
-                        self.serialize(primitive, code_map, position2, -direction, depth + 1)
+                        job_queue.append((position2, -direction, idx))
                     else:
-                        if OP_USEVAL[op]:
-                            self.lines.append((op, val))
+                        req_size = OP_REQSIZE[op]
+                        if req_size > 0:
+                            brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
+                            idx = len(lines)
+                            code_map[position, direction + 10] = idx
+                            code_map[position, direction] = idx + 1
+                            lines.append((brop, idx))
+                            if OP_USEVAL[op]:
+                                lines.append((op, val))
+                            else:
+                                lines.append((op, -1))
+                            position1 = primitive.advance_position(position, direction, step)
+                            job_queue.append((position1, direction, -1))
+                            position2 = primitive.advance_position(position, -direction, step)
+                            job_queue.append((position2, -direction, idx))
                         else:
-                            self.lines.append((op, -1))
-                            if op == OP_HALT:
-                                break
-            position = primitive.advance_position(position, direction, step)
+                            if OP_USEVAL[op]:
+                                lines.append((op, val))
+                            else:
+                                lines.append((op, -1))
+                                if op == OP_HALT:
+                                    break
+                position = primitive.advance_position(position, direction, step)
+        return lines, label_map, code_map
 
-    def optimize_reachability(self, pc, stacksize, reachability):
-        queue = [(pc, stacksize)]
-        while len(queue) > 0:
-            pc, stacksize = queue.pop(0) 
+    def optimize_reachability(self):
+        reachability = [-1] * len(self.lines)
+        job_queue = [(0, 0)]
+        while len(job_queue) > 0:
+            pc, stacksize = job_queue.pop(0) 
             while pc < len(self.lines):
                 assert stacksize >= 0
                 op, val = self.lines[pc]
@@ -324,15 +330,15 @@ class Serializer(object):
                         continue
                     else:
                         reachability[pc] = stacksize
-                        queue.append((pc + 1, stacksize))
-                        queue.append((self.label_map[val], stacksize))
+                        job_queue.append((pc + 1, stacksize))
+                        job_queue.append((self.label_map[val], stacksize))
                         break
                 elif op == OP_BRZ:
                     stacksize -= 1
                     if stacksize < 0: stacksize = 0
                     reachability[pc] = stacksize
-                    queue.append((pc + 1, stacksize))
-                    queue.append((self.label_map[val], stacksize))
+                    job_queue.append((pc + 1, stacksize))
+                    job_queue.append((self.label_map[val], stacksize))
                     break
                 elif op == OP_JMP:
                     reachability[pc] = stacksize
@@ -347,10 +353,40 @@ class Serializer(object):
                         stacksize = 0
                     elif op == OP_HALT:
                         break
+        return reachability
+
+    def optimize_operation(self):
+        job_queue = [0]
+
+        in_queue = 0
+        queue_map = [-1] * len(self.lines)
+        while len(job_queue) > 0:
+            pc = job_queue.pop(0)
+            while pc < len(self.lines):
+                op, val = self.lines[pc]
+                if queue_map[pc] >= 0:
+                    if in_queue == 0 or queue_map[pc] == 1:
+                        break
+                queue_map[pc] = in_queue
+                if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2]:
+                    job_queue.append(pc + 1)
+                    job_queue.append(self.label_map[val])
+                    break
+                elif op == OP_JMP:
+                    job_queue.append(self.label_map[val])
+                    break
+                else:
+                    pc += 1
+                    if op == OP_SEL:
+                        in_queue = int(val == VAL_QUEUE)
+                    elif op == OP_HALT:
+                        break
+        print queue_map
+        raw_input()
+        
 
     def optimize(self):
-        reachability = [-1] * len(self.lines)
-        self.optimize_reachability(0, 0, reachability)
+        reachability = self.optimize_reachability()
 
         useless_map = [0] * len(self.lines)
         count = 0
@@ -379,6 +415,8 @@ class Serializer(object):
         self.lines = new
         self.label_map = new_label_map
         self.debug = new_debug
+
+#       self.optimize_operation()
 
 
     def write(self, fp=1):
