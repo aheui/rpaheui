@@ -215,17 +215,19 @@ class Serializer(object):
     def __init__(self):
         self.lines = []
         self.debug = None
+        self.label_map = {}
 
     def compile(self, program):
         """Compile to aheui-assembly representation."""
         primitive = PrimitiveProgram(program)
 
+        self.lines = []
+        self.label_map = {}
         code_map = {}
-        label_map = {}
-        self.serialize(primitive, code_map, label_map, (0, 0), DIR_DOWN)
+        self.serialize(primitive, code_map, (0, 0), DIR_DOWN)
         self.debug = Debug(primitive, self.lines, code_map)
 
-    def serialize(self, primitive, code_map, label_map, position, direction, depth=0):
+    def serialize(self, primitive, code_map, position, direction, depth=0):
         while True:
             if not position in primitive.pane:
                 position = primitive.advance_position(position, direction)
@@ -242,7 +244,9 @@ class Serializer(object):
                     target = code_map[posdir]
                 else:
                     target = index
-                self.lines.append((OP_JMP, target))
+                label_id = len(self.lines)
+                self.label_map[label_id] = target
+                self.lines.append((OP_JMP, label_id))
                 break
 
             code_map[position, direction] = len(self.lines)
@@ -271,12 +275,12 @@ class Serializer(object):
                 elif op == OP_BRZ:
                     idx = len(self.lines)
                     code_map[position, direction + 10] = idx
-                    self.lines.append((OP_BRZ, -1))
+                    self.lines.append((OP_BRZ, idx))
                     position1 = primitive.advance_position(position, direction, step)
-                    self.serialize(primitive, code_map, label_map, position1, direction, depth + 1)
-                    self.lines[idx] = OP_BRZ, len(self.lines)
+                    self.serialize(primitive, code_map, position1, direction, depth + 1)
+                    self.label_map[idx] = len(self.lines)
                     position2 = primitive.advance_position(position, -direction, step)
-                    self.serialize(primitive, code_map, label_map, position2, -direction, depth + 1)
+                    self.serialize(primitive, code_map, position2, -direction, depth + 1)
                 else:
                     req_size = OP_REQSIZE[op]
                     if req_size > 0:
@@ -284,16 +288,16 @@ class Serializer(object):
                         idx = len(self.lines)
                         code_map[position, direction + 10] = idx
                         code_map[position, direction] = idx + 1
-                        self.lines.append((brop, -1))
+                        self.lines.append((brop, idx))
                         if OP_USEVAL[op]:
                             self.lines.append((op, val))
                         else:
                             self.lines.append((op, -1))
                         position1 = primitive.advance_position(position, direction, step)
-                        self.serialize(primitive, code_map, label_map, position1, direction, depth + 1)
-                        self.lines[idx] = brop, len(self.lines)
+                        self.serialize(primitive, code_map, position1, direction, depth + 1)
+                        self.label_map[idx] = len(self.lines)
                         position2 = primitive.advance_position(position, -direction, step)
-                        self.serialize(primitive, code_map, label_map, position2, -direction, depth + 1)
+                        self.serialize(primitive, code_map, position2, -direction, depth + 1)
                     else:
                         if OP_USEVAL[op]:
                             self.lines.append((op, val))
@@ -321,18 +325,18 @@ class Serializer(object):
                     else:
                         reachability[pc] = stacksize
                         queue.append((pc + 1, stacksize))
-                        queue.append((val, stacksize))
+                        queue.append((self.label_map[val], stacksize))
                         break
                 elif op == OP_BRZ:
                     stacksize -= 1
                     if stacksize < 0: stacksize = 0
                     reachability[pc] = stacksize
                     queue.append((pc + 1, stacksize))
-                    queue.append((val, stacksize))
+                    queue.append((self.label_map[val], stacksize))
                     break
                 elif op == OP_JMP:
                     reachability[pc] = stacksize
-                    pc = val
+                    pc = self.label_map[val]
                 else:
                     reachability[pc] = stacksize
                     stacksize -= OP_STACKDEL[op]
@@ -356,25 +360,26 @@ class Serializer(object):
                 count += 1
         
         new = []
-        removed = 0
         code_map = {}
         for i, (op, val) in enumerate(self.lines):
             if reachability[i] < 0:
                 continue
-            if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
-                new.append((op, val - useless_map[val]))
-            else:
-                new.append((op, val))
+            new.append((op, val))
             if i in self.debug.inv_map:
                 keys = self.debug.inv_map[i]
                 useless_count = useless_map[i]
                 for key in keys:
                     code_map[key] = i - useless_count
 
+        new_label_map = {}
+        for label, idx in self.label_map.items():
+            new_label_map[label] = idx - useless_map[idx]
 
         new_debug = Debug(self.debug.primitive, new, code_map) # wrong
         self.lines = new
+        self.label_map = new_label_map
         self.debug = new_debug
+
 
     def write(self, fp=1):
         for op, val in self.lines:

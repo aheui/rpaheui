@@ -204,12 +204,13 @@ def get_number():
 
 
 class Program(object):
-    _immutable_fields_ = ['opcodes[*]', 'values[*]', 'size']
+    _immutable_fields_ = ['labels[*]', 'opcodes[*]', 'values[*]', 'size']
 
-    def __init__(self, lines):
+    def __init__(self, lines, label_map):
         self.opcodes = [l[0] for l in lines]
         self.values = [l[1] for l in lines]
         self.size = len(lines)
+        self.labels = label_map
 
     @elidable
     def get_op(self, pc):
@@ -223,6 +224,9 @@ class Program(object):
     def get_req_size(self, pc):
         return OP_REQSIZE[self.get_op(pc)]
 
+    @elidable
+    def get_label(self, pc):
+        return self.labels[self.get_value(pc)]
 
 
 def mainloop(program, debug):
@@ -275,14 +279,14 @@ def mainloop(program, debug):
         elif op == OP_BRZ:
             r = selected.pop()
             if r == 0:
-                value = program.get_value(pc)
+                value = program.get_label(pc)
                 pc = value
                 stackok = program.get_req_size(pc) <= stacksize
                 driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == OP_BRPOP1 or op == OP_BRPOP2:
             if not stackok:
-                value = program.get_value(pc)
+                value = program.get_label(pc)
                 pc = value
                 stackok = program.get_req_size(pc) <= stacksize
                 driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
@@ -300,7 +304,7 @@ def mainloop(program, debug):
             c = get_utf8()
             selected.push(c)
         elif op == OP_JMP:
-            value = program.get_value(pc)
+            value = program.get_label(pc)
             pc = value
             stackok = program.get_req_size(pc) <= stacksize
             driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
@@ -357,7 +361,7 @@ def entry_point(argv):
         except:
             pass
 
-    program = Program(assembler.lines)
+    program = Program(assembler.lines, assembler.label_map)
     exitcode = mainloop(program, assembler.debug)
     return exitcode
 
