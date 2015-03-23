@@ -313,15 +313,15 @@ class Serializer(object):
         return lines, label_map, code_map
 
     def optimize_reachability(self):
-        reachability = [-1] * len(self.lines)
+        minstack_map = [-1] * len(self.lines)
         job_queue = [(0, 0)]
         while len(job_queue) > 0:
             pc, stacksize = job_queue.pop(0) 
             while pc < len(self.lines):
                 assert stacksize >= 0
                 op, val = self.lines[pc]
-                if reachability[pc] >= 0:
-                    if reachability[pc] <= stacksize:
+                if minstack_map[pc] >= 0:
+                    if minstack_map[pc] <= stacksize:
                         break
                 if op == OP_BRPOP1 or op == OP_BRPOP2:
                     reqsize = OP_REQSIZE[op]
@@ -329,22 +329,22 @@ class Serializer(object):
                         pc += 1
                         continue
                     else:
-                        reachability[pc] = stacksize
+                        minstack_map[pc] = stacksize
                         job_queue.append((pc + 1, stacksize))
                         job_queue.append((self.label_map[val], stacksize))
                         break
                 elif op == OP_BRZ:
                     stacksize -= 1
                     if stacksize < 0: stacksize = 0
-                    reachability[pc] = stacksize
+                    minstack_map[pc] = stacksize
                     job_queue.append((pc + 1, stacksize))
                     job_queue.append((self.label_map[val], stacksize))
                     break
                 elif op == OP_JMP:
-                    reachability[pc] = stacksize
+                    minstack_map[pc] = stacksize
                     pc = self.label_map[val]
                 else:
-                    reachability[pc] = stacksize
+                    minstack_map[pc] = stacksize
                     stacksize -= OP_STACKDEL[op]
                     if stacksize < 0: stacksize = 0
                     stacksize += OP_STACKADD[op]
@@ -353,27 +353,29 @@ class Serializer(object):
                         stacksize = 0
                     elif op == OP_HALT:
                         break
+
+        reachability = [int(minstack >= 0) for minstack in minstack_map]
         return reachability
 
     def optimize_operation(self):
-        job_queue = [0]
+        job_queue = [(0, 0)]
 
-        in_queue = 0
-        queue_map = [-1] * len(self.lines)
+        lines = self.lines
+        queue_map = [-1] * len(lines)
         while len(job_queue) > 0:
-            pc = job_queue.pop(0)
-            while pc < len(self.lines):
-                op, val = self.lines[pc]
+            pc, in_queue = job_queue.pop(0)
+            while pc < len(lines):
+                op, val = lines[pc]
                 if queue_map[pc] >= 0:
                     if in_queue == 0 or queue_map[pc] == 1:
                         break
                 queue_map[pc] = in_queue
                 if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2]:
-                    job_queue.append(pc + 1)
-                    job_queue.append(self.label_map[val])
+                    job_queue.append((pc + 1, in_queue))
+                    job_queue.append((self.label_map[val], in_queue))
                     break
                 elif op == OP_JMP:
-                    job_queue.append(self.label_map[val])
+                    job_queue.append((self.label_map[val], in_queue))
                     break
                 else:
                     pc += 1
@@ -381,47 +383,95 @@ class Serializer(object):
                         in_queue = int(val == VAL_QUEUE)
                     elif op == OP_HALT:
                         break
-        print queue_map
-        raw_input()
-        
+        assert -1 not in queue_map
+       
+        reachability = [1] * len(lines)
+        for i in range(2, len(lines)):
+            op, val = lines[i]
+            if op not in [OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_CMP]:
+                continue
+            i1 = i - 1
+            while lines[i1][0] == OP_NONE and i1 >= 1:
+                i1 -= 1
+            i2 = i1 - 1
+            while lines[i1][0] == OP_NONE and i2 >= 0:
+                i2 -= 1
+            if queue_map[i] or queue_map[i1] or queue_map[i2]:
+                continue
+            inst1 = lines[i1]
+            inst2 = lines[i2]
+            if not inst2[0] == OP_PUSH:
+                continue
+            v2 = inst2[1]
+            if inst1[0] == OP_PUSH:
+                v1 = inst1[1]
+            elif inst1[0] == OP_DUP:
+                v1 = v2
+            else:
+                continue
+            if op == OP_ADD:
+                v = v2 + v1
+            elif op == OP_SUB:
+                v = v2 - v1
+            elif op == OP_MUL:
+                v = v2 * v1
+            elif op == OP_DIV:
+                v = v2 / v1
+            elif op == OP_MOD:
+                v = v2 % v1
+            elif op == OP_CMP:
+                v = int(v2 >= v1)
+            else:
+                assert False
+            lines[i] = (OP_PUSH, v)
+            lines[i1] = (OP_NONE, -1)
+            lines[i2] = (OP_NONE, -1)
+            reachability[i1] = 0
+            reachability[i2] = 0
+        return reachability
 
-    def optimize(self):
-        reachability = self.optimize_reachability()
 
-        useless_map = [0] * len(self.lines)
+    def optimize_adjust(self, reachability):
+        useless_map = [0] * len(reachability)
         count = 0
-        for i, able in enumerate(reachability):
+        for i, reachable in enumerate(reachability):
             useless_map[i] = count
-            if able < 0:
+            if not reachable:
                 count += 1
         
         new = []
         code_map = {}
+        new_label_map = {}
         for i, (op, val) in enumerate(self.lines):
-            if reachability[i] < 0:
+            if not reachability[i]:
                 continue
             new.append((op, val))
+            if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
+                target_idx = self.label_map[val]
+                new_label_map[val] = target_idx - useless_map[target_idx]
             if i in self.debug.inv_map:
                 keys = self.debug.inv_map[i]
                 useless_count = useless_map[i]
                 for key in keys:
                     code_map[key] = i - useless_count
 
-        new_label_map = {}
-        for label, idx in self.label_map.items():
-            new_label_map[label] = idx - useless_map[idx]
-
         new_debug = Debug(self.debug.primitive, new, code_map) # wrong
         self.lines = new
         self.label_map = new_label_map
         self.debug = new_debug
 
-#       self.optimize_operation()
+
+    def optimize(self):
+        reachability = self.optimize_reachability()
+        self.optimize_adjust(reachability)
+        reachability = self.optimize_operation()
+        self.optimize_adjust(reachability)
 
 
     def write(self, fp=1):
         for op, val in self.lines:
-         
+            if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
+                val = self.label_map[val]
             if val >= 0: 
                 p_val = chr(val & 0xff) + chr((val & 0xff00) >> 8) + chr((val & 0xff0000) >> 16)
             else:
@@ -438,6 +488,7 @@ class Serializer(object):
     def read(self, fp=0):
         self.debug = None
         self.lines = []
+        self.label_map = {}
         while True:
             buf = os.read(fp, 4)
             assert len(buf) == 4
@@ -448,15 +499,23 @@ class Serializer(object):
             if op > 128:
                 op -= 256
             self.lines.append((op, val))
+            if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
+                self.label_map[val] = val 
 
 
     def dump(self, fp=1):
+        label_revmap = {}
         for i, (op, val) in enumerate(self.lines):
+            if i in self.label_map.values():
+                os.write(fp, 'L%d:' % i)
             code = OPCODE_NAMES[op]
             if code is None:
                 code = 'inst' + str(op)
             if val != -1:
-                code_val = '%s %s' % (code, val)
+                if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
+                    code_val = '%s L%s' % (code, self.label_map[val])
+                else:
+                    code_val = '%s %s' % (code, val)
             else:
                 code_val = code
             if self.debug and i in self.debug.inv_map:
@@ -468,5 +527,4 @@ class Serializer(object):
                 debug_info = ''.join(debug_infos)
             else:
                 debug_info = ''
-            os.write(fp, '%s\t; L%d%s\n' % (code_val, i, debug_info))
-
+            os.write(fp, '\t%s\t; L%d%s\n' % (code_val, i, debug_info))

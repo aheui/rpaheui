@@ -116,7 +116,7 @@ class Stack(object):
 
     def cmp(self):
         r1, r2 = self.get_2_values()
-        r = 1 if r2 >= r1 else 0
+        r = int(r2 >= r1)
         self.put_value(r)
 
 
@@ -230,7 +230,7 @@ class Program(object):
 
 
 def mainloop(program, debug):
-    set_param(None, 'trace_limit', 50000)
+    set_param(None, 'trace_limit', 30000)
     assert_green(program)
     pc = 0
     stacksize = 0
