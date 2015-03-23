@@ -7,9 +7,10 @@ from const import *
 import serializer
 try:
     from rpython.rlib.jit import JitDriver
-    from rpython.rlib.jit import elidable, unroll_safe
+    from rpython.rlib.jit import elidable, dont_look_inside
     from rpython.rlib.jit import assert_green
-    from rpython.rlib.jit import set_param
+    from rpython.rlib.jit import set_param, PARAMETERS
+    TRACE_LIMIT = PARAMETERS['trace_limit']
 except ImportError:
     """Python compatibility."""
     class JitDriver(object):
@@ -22,6 +23,7 @@ except ImportError:
     def hint(v, **kw): return v
     def assert_green(x): pass
     def set_param(driver, name, value): pass
+    os.write(2, "[Warning] It is running without rlib/jit.\n")
 
 
 def get_location(pc, stackok, is_queue, program):
@@ -34,120 +36,126 @@ def get_location(pc, stackok, is_queue, program):
     return "#%d(s%d)_%s_%d" % (pc, stackok, serializer.OPCODE_NAMES[op], val)
 
 driver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
-set_param(driver, 'trace_limit', 100000)
 
 
 DEBUG = False
 
 
+class Link(object):
+    """Element unit for stack and queue."""
+
+    def __init__(self, next, value=-1):
+        self.value = value
+        self.next = next
+
 class Stack(object):
+    """Base data storage for Aheui, except for ieung and hieuh."""
 
     def __init__(self):
-        self.size = 0x1000
-        self.list = [0] * self.size
-        self.pos = 0
+        self.head = Link(None)
+        self.size = 0
 
-    @unroll_safe
     def push(self, value):
-        pos = self.pos
-        #assert pos >= 0
-        self.list[pos] = value
-        new_pos = pos + 1
-        self.pos = new_pos
-        if new_pos >= self.size:
-            self.list += [0] * self.size
-            self.size = len(self.list)
+        node = Link(self.head, value)
+        self.size += 1
+        self.head = node
 
-    @unroll_safe
     def pop(self):
-        pos = self.pos
-        new_pos = pos - 1
-        #assert new_pos >= 0
-        v = self.list[new_pos]
-        self.pos = new_pos
-        return v
+        node = self.head
+        value = node.value
+        self.size -= 1
+        self.head = node.next
+        del node
+        return value
 
-    @unroll_safe
     def dup(self):
-        pos = self.pos
-        last_pos = pos - 1
-        #assert last_pos >= 0
-        v = self.list[last_pos]
-        self.push(v)
+        self.push(self.head.value)
 
-    @unroll_safe
     def swap(self):
-        pos = self.pos
-        self.list[pos - 2], self.list[pos - 1] = self.list[pos - 1], self.list[pos - 2]
+        node1 = self.head
+        node2 = node1.next
+        node1.value, node2.value = node2.value, node1.value
 
-    @unroll_safe
+    # Tools for common methods. inline?
+
+    def get_2_values(self):
+        return self.pop(), self.head.value
+
+    def put_value(self, value):
+        self.head.value = value
+
+    # Common methods from here
+
     def __len__(self):
-        return self.pos
+        return self.size
 
-    @unroll_safe
     def add(self):
-        r1 = self.pop()
-        r2 = self.pop()
+        r1, r2 = self.get_2_values()
         r = r2 + r1
-        self.push(r)
+        self.put_value(r)
 
-    @unroll_safe
     def sub(self):
-        r1 = self.pop()
-        r2 = self.pop()
+        r1, r2 = self.get_2_values()
         r = r2 - r1
-        self.push(r)
+        self.put_value(r)
 
-    @unroll_safe
     def mul(self):
-        r1 = self.pop()
-        r2 = self.pop()
+        r1, r2 = self.get_2_values()
         r = r2 * r1
-        self.push(r)
+        self.put_value(r)
 
-    @unroll_safe
     def div(self):
-        r1 = self.pop()
-        r2 = self.pop()
+        r1, r2 = self.get_2_values()
         r = r2 / r1
-        self.push(r)
+        self.put_value(r)
 
-    @unroll_safe
     def mod(self):
-        r1 = self.pop()
-        r2 = self.pop()
+        r1, r2 = self.get_2_values()
         r = r2 % r1
-        self.push(r)
+        self.put_value(r)
 
-    @unroll_safe
     def cmp(self):
-        r1 = self.pop()
-        r2 = self.pop()
+        r1, r2 = self.get_2_values()
         r = 1 if r2 >= r1 else 0
-        self.push(r)
+        self.put_value(r)
 
 
 class Queue(Stack):
 
     def __init__(self):
-        self.list = []
-        self.pos = 0
+        self.tail = Link(None)
+        self.head = Link(self.tail)
+        self.size = 0
 
-    @unroll_safe
     def push(self, value):
-        self.list.append(value)
-        self.pos += 1
+        tail = self.tail
+        tail.value = value
+        new = Link(None)
+        tail.next = new
+        self.tail = new
+        self.size += 1
 
-    @unroll_safe
     def pop(self):
-        v = self.list.pop(0)
-        self.pos -= 1
-        return v
+        node = self.head.next
+        value = node.value
+        self.size -= 1
+        self.head.next = node.next
+        del node
+        return value
 
-    @unroll_safe
+    def dup(self):
+        self.push(self.head.next.value)
+
     def swap(self):
-        l = self.list
-        l[0], l[1] = l[1], l[0]
+        node1 = self.head.next
+        node2 = node1.next
+        node1.value, node2.value = node2.value, node1.value
+
+    def get_2_values(self):
+        return self.pop(), self.pop()
+
+    def put_value(self, value):
+        self.push(value)
 
 
 def init_storage():
@@ -161,6 +169,7 @@ def init_storage():
     return storage
 
 
+@dont_look_inside
 def get_utf8():
     """Get a utf-8 character from standard input.
 
@@ -194,6 +203,7 @@ def get_utf8():
          v = -1
     return v
 
+@dont_look_inside
 def get_number():
     """Get a number from standard input."""
     numchars = []
@@ -232,6 +242,7 @@ class Program(object):
 
 
 def mainloop(program, debug):
+    #set_param(None, 'trace_limit', 50000)
     assert_green(program)
     pc = 0
     stacksize = 0
@@ -245,7 +256,7 @@ def mainloop(program, debug):
         stackok = program.get_req_size(pc) <= stacksize
         driver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
         op = program.get_op(pc)
-        #assert_green(op)
+        assert_green(op)
         stacksize += - OP_STACKDEL[op] + OP_STACKADD[op]
         if op == OP_ADD:
             selected.add()
@@ -285,14 +296,7 @@ def mainloop(program, debug):
                 stackok = program.get_req_size(pc) <= stacksize
                 driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
                 continue
-        elif op == OP_BRPOP1:
-            if not stackok:
-                value = program.get_value(pc)
-                pc = value
-                stackok = program.get_req_size(pc) <= stacksize
-                driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
-                continue
-        elif op == OP_BRPOP2:
+        elif op == OP_BRPOP1 or op == OP_BRPOP2:
             if not stackok:
                 value = program.get_value(pc)
                 pc = value

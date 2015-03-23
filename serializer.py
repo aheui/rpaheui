@@ -84,11 +84,19 @@ class Debug(object):
             char = self.primitive.pane[pos[0][0]]
             os.write(fp, (u'%d %s\n' % (k, char)).encode('utf-8'))
 
+    def _list(self, list):
+        items = []
+        node = list.head
+        while node.next:
+            items.append(str(node.value))
+            node = node.next
+        return '[' + ', '.join(items) + ']'
+
     def storage(self, storage, selected=None):
         for i, l in enumerate(storage):
             marker = u':' if l == selected else u' '
             os.write(2, (u'%s (%d):%s' % (unichr(0x11a8 + i - 1), i, marker)).encode('utf-8'))
-            os.write(2, ('%s\n' % l.list[:l.pos]))
+            os.write(2, ('%s\n' % self._list(l)))
 
 
 class PrimitiveProgram(object):
