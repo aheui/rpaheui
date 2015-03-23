@@ -4,7 +4,7 @@
 import os
 
 from const import *
-import serializer
+import compile
 try:
     from rpython.rlib.jit import JitDriver
     from rpython.rlib.jit import elidable, dont_look_inside
@@ -33,7 +33,7 @@ def get_location(pc, stackok, is_queue, program):
     """
     op = program.get_op(pc)
     val = program.get_value(pc)
-    return "#%d(s%d)_%s_%d" % (pc, stackok, serializer.OPCODE_NAMES[op], val)
+    return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OPCODE_NAMES[op], val)
 
 driver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
 
@@ -330,10 +330,10 @@ def entry_point(argv):
         print 'aheui: error: no input files'
         return 1
     
-    assembler = serializer.Serializer()
+    compiler = compile.Compiler()
     fp = os.open(filename, os.O_RDONLY, 0777)
     if filename.endswith('.aheuic'):
-        assembler.read(fp)
+        compiler.read(fp)
         os.close(fp)
     else:
         program_contents = ''
@@ -344,8 +344,8 @@ def entry_point(argv):
             program_contents += read
         os.close(fp)
             
-        assembler.compile(program_contents)
-        assembler.optimize()
+        compiler.compile(program_contents)
+        compiler.optimize()
 
         binname = filename
         if binname.endswith('.aheui'):
@@ -354,15 +354,15 @@ def entry_point(argv):
             binname += '.aheuic'
         try:
             bfp = os.open(binname, os.O_WRONLY|os.O_CREAT, 0644)
-            assembler.write(bfp)
+            compiler.write(bfp)
             os.write(bfp, '\n\n')
-            assembler.dump(bfp)
+            compiler.dump(bfp)
             os.close(bfp)
         except:
             pass
 
-    program = Program(assembler.lines, assembler.label_map)
-    exitcode = mainloop(program, assembler.debug)
+    program = Program(compiler.lines, compiler.label_map)
+    exitcode = mainloop(program, compiler.debug)
     return exitcode
 
 

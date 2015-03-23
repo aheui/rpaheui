@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import os
-import serializer
+import compile
 
 def run(fp):
     program_contents = ''
@@ -11,7 +11,7 @@ def run(fp):
             break
         program_contents += read
     os.close(fp)
-    assembler = serializer.Serializer()
+    assembler = compile.Compiler()
     assembler.compile(program_contents)
     assembler.optimize()
     assembler.dump()

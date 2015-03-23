@@ -211,7 +211,15 @@ def dir_from_mv(mv_code, direction):
         return direction, 1
 
 
-class Serializer(object):
+class Compiler(object):
+    """Compiler manipulate any kinds of aheui related code representation.
+
+    1. `compile` accepts raw aheui code text and generate serialized bytecodes.
+    2. `optimize` optimizes loaded bytecodes.
+    3. `read` and `write` read and write bytecodes.
+    3. `dump` writes assembly.
+    """
+
     def __init__(self):
         self.lines = []
         self.debug = None
@@ -225,6 +233,20 @@ class Serializer(object):
         self.debug = Debug(primitive, self.lines, code_map)
 
     def serialize(self, primitive):
+        """Serialize Aheui primitive codes.
+
+        1. Start to trace the code pane from (0, 0)
+        2. If there is branchable code,
+            1. Add a label
+            2. Set the label as target of jump.
+            3. Add branch point to `job_queue`
+            4. When it is dequeued, add the address to `label_map` and trace it.
+        3. If serializer passes same code with same direction,
+            1. Add `OP_JMP` to serialized address to connect.
+            2. Stop the job and go to next job in the queue.
+        4. If there is `OP_HALT`, go to next job in the queue.
+        5. If `job_queue` is empty, drop any other instructions not on the path.
+        """
         job_queue = [((0, 0), DIR_DOWN, -1)]
 
         lines = []
@@ -282,10 +304,8 @@ class Serializer(object):
                         idx = len(lines)
                         code_map[position, direction + 10] = idx
                         lines.append((OP_BRZ, idx))
-                        position1 = primitive.advance_position(position, direction, step)
-                        job_queue.append((position1, direction, -1))
-                        position2 = primitive.advance_position(position, -direction, step)
-                        job_queue.append((position2, -direction, idx))
+                        alt_position = primitive.advance_position(position, -direction, step)
+                        job_queue.append((alt_position, -direction, idx))
                     else:
                         req_size = OP_REQSIZE[op]
                         if req_size > 0:
@@ -298,10 +318,8 @@ class Serializer(object):
                                 lines.append((op, val))
                             else:
                                 lines.append((op, -1))
-                            position1 = primitive.advance_position(position, direction, step)
-                            job_queue.append((position1, direction, -1))
-                            position2 = primitive.advance_position(position, -direction, step)
-                            job_queue.append((position2, -direction, idx))
+                            alt_position = primitive.advance_position(position, -direction, step)
+                            job_queue.append((alt_position, -direction, idx))
                         else:
                             if OP_USEVAL[op]:
                                 lines.append((op, val))
@@ -313,6 +331,20 @@ class Serializer(object):
         return lines, label_map, code_map
 
     def optimize_reachability(self):
+        """Optimize codes by removing unreachable codes.
+
+        Because unreachable path is already removed by `serialize`, this path
+        mainly remove useless OP_BRPOPs and its branches.
+
+        1. Trace current stack size from first line.
+        2. If there is enough stack, do not trace OP_BRPOPs' jumps.
+        3. If optimizer met OP_SEL, assume stacksize is 0 from there.
+        3. If optimizer passes same codes,
+            1. If assumed stacksize is smaller than before, keep going to trace.
+            2. Otherwise it is not worth to do. Stop.
+        4. Stop if OP_HALT.
+        5. Drop useless OP_BRPOPs and any codes out of path.
+        """
         minstack_map = [-1] * len(self.lines)
         job_queue = [(0, 0)]
         while len(job_queue) > 0:
@@ -330,34 +362,48 @@ class Serializer(object):
                         continue
                     else:
                         minstack_map[pc] = stacksize
-                        job_queue.append((pc + 1, stacksize))
                         job_queue.append((self.label_map[val], stacksize))
-                        break
                 elif op == OP_BRZ:
                     stacksize -= 1
                     if stacksize < 0: stacksize = 0
                     minstack_map[pc] = stacksize
-                    job_queue.append((pc + 1, stacksize))
                     job_queue.append((self.label_map[val], stacksize))
-                    break
                 elif op == OP_JMP:
                     minstack_map[pc] = stacksize
                     pc = self.label_map[val]
+                    continue
                 else:
                     minstack_map[pc] = stacksize
                     stacksize -= OP_STACKDEL[op]
                     if stacksize < 0: stacksize = 0
                     stacksize += OP_STACKADD[op]
-                    pc += 1
                     if op == OP_SEL:
                         stacksize = 0
                     elif op == OP_HALT:
                         break
+                pc += 1
 
         reachability = [int(minstack >= 0) for minstack in minstack_map]
         return reachability
 
     def optimize_operation(self):
+        """Optimize codes by removing constant operation.
+
+        Because constants in aheui usuallly is generated by codes, aheui codes
+        are normally full of OP_PUSH and operations. This path merge constants
+        operations.
+
+        1. Trace the code is passing when it is using queue or stack.
+        2. If there is OP_SEL with ieung, suppose it is potential queue code.
+        3. If tracer passes same codes,
+            1. If current guess is queue but it was stack before, keep going.
+            2. Otherwise stop.
+        4. Repeat 2-3 until there is no jobs in queue.
+        5. Let's start to optimize the code from the start to the end.
+        6. Pick 3 consecutive instructions. If there is OP_NONE, ignore it.
+        7. If 3 instructions don't includes labels for jump, potential queue
+            codes and consists of only constants instructions, merge it.
+        """
         job_queue = [(0, 0)]
 
         lines = self.lines
@@ -462,13 +508,19 @@ class Serializer(object):
 
 
     def optimize(self):
+        """Optimize generated codes.
+
+        Do not decouple each steps or change the order. It is important.
+        """
         reachability = self.optimize_reachability()
         self.optimize_adjust(reachability)
+
         reachability = self.optimize_operation()
         self.optimize_adjust(reachability)
 
 
     def write(self, fp=1):
+        """Write bytecodes down for given fp."""
         for op, val in self.lines:
             if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
                 val = self.label_map[val]
@@ -486,6 +538,7 @@ class Serializer(object):
 
 
     def read(self, fp=0):
+        """Read bytecodes from given fp."""
         self.debug = None
         self.lines = []
         self.label_map = {}
@@ -504,6 +557,7 @@ class Serializer(object):
 
 
     def dump(self, fp=1):
+        """Write assembly representation with comments."""
         label_revmap = {}
         for i, (op, val) in enumerate(self.lines):
             if i in self.label_map.values():
