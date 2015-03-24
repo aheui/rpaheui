@@ -32,7 +32,7 @@ def get_location(pc, stackok, is_queue, program):
     PYPYLOG=jit-log-opt,jit-backend,jit-summary:<filename>
     """
     op = program.get_op(pc)
-    val = program.get_value(pc)
+    val = program.get_operand(pc)
     return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OPCODE_NAMES[op], val)
 
 driver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
@@ -224,7 +224,7 @@ class Program(object):
         return self.opcodes[pc]
 
     @elidable
-    def get_value(self, pc):
+    def get_operand(self, pc):
         return self.values[pc]
 
     @elidable
@@ -233,7 +233,7 @@ class Program(object):
 
     @elidable
     def get_label(self, pc):
-        return self.labels[self.get_value(pc)]
+        return self.labels[self.get_operand(pc)]
 
 
 def mainloop(program, debug):
@@ -266,20 +266,20 @@ def mainloop(program, debug):
         elif op == OP_POP:
             selected.pop()
         elif op == OP_PUSH:
-            value = program.get_value(pc)
+            value = program.get_operand(pc)
             selected.push(value)
         elif op == OP_DUP:
             selected.dup()
         elif op == OP_SWAP:
             selected.swap()
         elif op == OP_SEL:
-            value = program.get_value(pc)
+            value = program.get_operand(pc)
             selected = storage[value]
             stacksize = len(selected)
             is_queue = value == VAL_QUEUE
         elif op == OP_MOV:
             r = selected.pop()
-            value = program.get_value(pc)
+            value = program.get_operand(pc)
             storage[value].push(r)
         elif op == OP_CMP:
             selected.cmp()

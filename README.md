@@ -1,4 +1,4 @@
-aheui rpython implementation
+RpAheui - Aheui rpython implementation
 ====
 
 * What is rpython?: [http://rpython.readthedocs.org][rpython]
@@ -7,6 +7,40 @@ aheui rpython implementation
 git clone https://github.com/aheui/rpaheui
 make # set RPYTHON in Makefile. You can get pypy by: hg clone http://bitbucket.org/pypy/pypy
 ./aheui-c <your-aheui-code>
+```
+
+How to pronounce
+----
+- / a _r_ p a h i /
+- R-pa-hee
+- 알파희 (Because it is written in rpython or 알파희썬)
+
+JIT speedup
+----
+PyPy technology advanced PyPy faster than CPython. (See [http://speed.pypy.org/](http://speed.pypy.org/))
+
+It also boosts RpAheui too. RpAheui is 20x faster than caheui!
+
+```
+$ time AHEUI=../rpaheui/aheui-c ./test.sh logo/
+testset: logo/
+  test logo...success!
+test status: 1/1
+
+real	0m1.795s
+user	0m1.087s
+sys	0m1.262s
+```
+
+```
+$ time AHEUI=../caheui/aheui ./test.sh logo/
+testset: logo/
+  test logo...success!
+test status: 1/1
+
+real	0m23.953s
+user	0m23.843s
+sys	0m0.058s
 ```
 
 ahsembler
