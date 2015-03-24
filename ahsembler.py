@@ -14,7 +14,7 @@ def run(fp):
     assembler = compile.Compiler()
     assembler.compile(program_contents)
     assembler.optimize()
-    assembler.dump()
+    assembler.write_asm()
     return 0
 
 def entry_point(argv):

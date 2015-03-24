@@ -35,5 +35,6 @@ OP_BRPOP2 = -3 # special
 OP_BRPOP1 = -2 # special
 OP_JMP = -1 # special
 
-
+OP_BRANCHES = [OP_BRZ, OP_BRPOP1, OP_BRPOP2]
+OP_JUMPS = OP_BRANCHES + [OP_JMP]
 

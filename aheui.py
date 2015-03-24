@@ -345,6 +345,8 @@ def entry_point(argv):
         fp = os.open(filename, os.O_RDONLY, 0777)
     if filename.endswith('.aheuic'):
         compiler.read(fp)
+    elif filename.endswith('.aheuis'):
+        compiler.read_asm(fp)
     else:
         program_contents = ''
         while True:
@@ -356,19 +358,20 @@ def entry_point(argv):
         compiler.compile(program_contents)
         compiler.optimize()
 
-        binname = filename
-        if binname.endswith('.aheui'):
-            binname += 'c'
-        else:
-            binname += '.aheuic'
-        try:
-            bfp = os.open(binname, os.O_WRONLY|os.O_CREAT, 0644)
-            compiler.write(bfp)
-            os.write(bfp, '\n\n')
-            compiler.dump(bfp)
-            os.close(bfp)
-        except:
-            pass
+        if filename != '-':
+            binname = filename
+            if binname.endswith('.aheui'):
+                binname += 'c'
+            else:
+                binname += '.aheuic'
+            try:
+                bfp = os.open(binname, os.O_WRONLY|os.O_CREAT, 0644)
+                compiler.write(bfp)
+                os.write(bfp, '\n\n')
+                compiler.write_asm(bfp)
+                os.close(bfp)
+            except:
+                pass
     os.close(fp)
 
     program = Program(compiler.lines, compiler.label_map)

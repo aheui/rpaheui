@@ -492,7 +492,7 @@ class Compiler(object):
             if not reachability[i]:
                 continue
             new.append((op, val))
-            if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
+            if op in OP_JUMPS:
                 target_idx = self.label_map[val]
                 new_label_map[val] = target_idx - useless_map[target_idx]
             if i in self.debug.inv_map:
@@ -522,7 +522,7 @@ class Compiler(object):
     def write(self, fp=1):
         """Write bytecodes down for given fp."""
         for op, val in self.lines:
-            if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
+            if op in OP_JUMPS:
                 val = self.label_map[val]
             if val >= 0: 
                 p_val = chr(val & 0xff) + chr((val & 0xff00) >> 8) + chr((val & 0xff0000) >> 16)
@@ -552,11 +552,11 @@ class Compiler(object):
             if op > 128:
                 op -= 256
             self.lines.append((op, val))
-            if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
+            if op in OP_JUMPS:
                 self.label_map[val] = val 
 
 
-    def dump(self, fp=1):
+    def write_asm(self, fp=1):
         """Write assembly representation with comments."""
         label_revmap = {}
         for i, (op, val) in enumerate(self.lines):
@@ -566,7 +566,7 @@ class Compiler(object):
             if code is None:
                 code = 'inst' + str(op)
             if val != -1:
-                if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2, OP_JMP]:
+                if op in OP_JUMPS:
                     code_val = '%s L%s' % (code, self.label_map[val])
                 else:
                     code_val = '%s %s' % (code, val)
@@ -582,3 +582,48 @@ class Compiler(object):
             else:
                 debug_info = ''
             os.write(fp, '\t%s\t; L%d%s\n' % (code_val, i, debug_info))
+
+    def read_asm(self, fp=0):
+        """Read assembly representation."""
+        OPCODE_MAP = {}
+        for opcode, name in enumerate(OPCODE_NAMES):
+            if name in ['BRPOP1', 'BRPOP2', 'JMP']:
+                opcode -= len(OPCODE_NAMES)
+            OPCODE_MAP[name] = opcode
+        label_name_map = {}
+        label_map = {}
+        
+        text_fragments = []
+        while True:
+            buf = os.read(fp, 1024)
+            if buf == '':
+                break
+            text_fragments.append(buf)
+        text = ''.join(text_fragments)
+
+        lines = []
+        for row in text.split('\n'):
+            main = row.split(';')[0]
+            if ':' in main:
+                label, main = main.split(':')
+                label = label.strip()
+                label_name_map[label] = len(lines)
+            main = main.strip(' \t')
+            if not main:
+                continue
+            parts = main.split(' ')
+            opcode = OPCODE_MAP[parts[0].upper()]
+            val = parts[-1]
+            if opcode in OP_JUMPS:
+                label_map[val] = len(lines)
+                lines.append((opcode, len(lines)))
+            elif OP_USEVAL[opcode]:
+                lines.append((opcode, int(val)))
+            else:
+                lines.append((opcode, -1))
+        self.debug = None
+        self.lines = lines
+        self.label_map = {}
+        for key in label_name_map.keys():
+            self.label_map[label_map[key]] = label_name_map[key]
+

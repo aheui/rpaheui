@@ -3,6 +3,9 @@ RPYTHON=../pypy/rpython/bin/rpython
 RPYTHONFLAGS=--opt=jit
 #RPYTHONFLAGS=
 
+all: build ahsembler
+	
+
 build:
 	$(RPYTHON) $(RPYTHONFLAGS) aheui.py
 
