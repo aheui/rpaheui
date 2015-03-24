@@ -426,7 +426,7 @@ class Compiler(object):
                 else:
                     pc += 1
                     if op == OP_SEL:
-                        in_queue = int(val == VAL_QUEUE)
+                        in_queue = int(val == VAL_QUEUE or val == VAL_PORT)
                     elif op == OP_HALT:
                         break
         assert -1 not in queue_map
@@ -587,6 +587,8 @@ class Compiler(object):
         """Read assembly representation."""
         OPCODE_MAP = {}
         for opcode, name in enumerate(OPCODE_NAMES):
+            if name is None:
+                continue
             if name in ['BRPOP1', 'BRPOP2', 'JMP']:
                 opcode -= len(OPCODE_NAMES)
             OPCODE_MAP[name] = opcode

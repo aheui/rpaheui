@@ -3,7 +3,7 @@ RPYTHON=../pypy/rpython/bin/rpython
 RPYTHONFLAGS=--opt=jit
 #RPYTHONFLAGS=
 
-all: build ahsembler
+all: build
 	
 
 build:

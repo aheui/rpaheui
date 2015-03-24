@@ -149,15 +149,26 @@ class Queue(Stack):
         self.push(value)
 
 
-def init_storage():
-    """Initialize stacks and a queue for program."""
-    storage = []
-    for i in range(0, 28):
-        if i == VAL_QUEUE:
-            storage.append(Queue())
-        else:
-            storage.append(Stack())
-    return storage
+class Port(Stack):
+    pass
+
+
+class Storage(object):
+    _immutable_fields = ['pools[*]']
+
+    def __init__(self):
+        pools = []
+        for i in range(0, 28):
+            if i == VAL_QUEUE:
+                pools.append(Queue())
+            elif i == VAL_PORT:
+                pools.append(Port())
+            else:
+                pools.append(Stack())
+        self.pools = pools
+
+    def __getitem__(self, idx):
+        return self.pools[idx]
 
 
 @dont_look_inside
@@ -242,7 +253,7 @@ def mainloop(program, debug):
     pc = 0
     stacksize = 0
     is_queue = False
-    storage = init_storage()
+    storage = Storage()
     selected = storage[0]
     while pc < program.size:
         #debug.storage(storage, selected)
