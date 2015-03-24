@@ -135,6 +135,13 @@ class Queue(Stack):
         self.tail = new
         self.size += 1
 
+    def dup(self):
+        head = self.head
+        value = head.next.value
+        node = Link(head.next, value)
+        head.next = node
+        self.size += 1
+
     def get_2_values(self):
         return self.pop(), self.pop()
 
