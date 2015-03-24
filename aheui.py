@@ -338,10 +338,13 @@ def entry_point(argv):
         return 1
     
     compiler = compile.Compiler()
-    fp = os.open(filename, os.O_RDONLY, 0777)
+
+    if filename == '-':
+        fp = 0
+    else:
+        fp = os.open(filename, os.O_RDONLY, 0777)
     if filename.endswith('.aheuic'):
         compiler.read(fp)
-        os.close(fp)
     else:
         program_contents = ''
         while True:
@@ -349,8 +352,7 @@ def entry_point(argv):
             if len(read) == 0:
                 break
             program_contents += read
-        os.close(fp)
-            
+ 
         compiler.compile(program_contents)
         compiler.optimize()
 
@@ -367,6 +369,7 @@ def entry_point(argv):
             os.close(bfp)
         except:
             pass
+    os.close(fp)
 
     program = Program(compiler.lines, compiler.label_map)
     exitcode = mainloop(program, compiler.debug)
