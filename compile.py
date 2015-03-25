@@ -336,15 +336,22 @@ class Compiler(object):
         Because unreachable path is already removed by `serialize`, this path
         mainly remove useless OP_BRPOPs and its branches.
 
-        1. Trace current stack size from first line.
-        2. If there is enough stack, do not trace OP_BRPOPs' jumps.
-        3. If optimizer met OP_SEL, assume stacksize is 0 from there.
-        3. If optimizer passes same codes,
+        1. Remove indirect jumps.
+        2. Trace current stack size from first line.
+        3. If there is enough stack, do not trace OP_BRPOPs' jumps.
+        4. If optimizer met OP_SEL, assume stacksize is 0 from there.
+        5. If optimizer passes same codes,
             1. If assumed stacksize is smaller than before, keep going to trace.
             2. Otherwise it is not worth to do. Stop.
-        4. Stop if OP_HALT.
-        5. Drop useless OP_BRPOPs and any codes out of path.
+        6. Stop if OP_HALT.
+        7. Drop useless OP_BRPOPs and any codes out of path.
         """
+        for label, direct_target in self.label_map.items():
+            op, operand = self.lines[direct_target]
+            if op == OP_JMP:
+                indirect_target = self.label_map[operand]
+                self.label_map[label] = indirect_target
+
         minstack_map = [-1] * len(self.lines)
         job_queue = [(0, 0)]
         while len(job_queue) > 0:
