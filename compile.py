@@ -430,7 +430,7 @@ class Compiler(object):
                     elif op == OP_HALT:
                         break
         assert -1 not in queue_map
-       
+
         reachability = [1] * len(lines)
         for i in range(2, len(lines)):
             op, val = lines[i]
@@ -617,8 +617,12 @@ class Compiler(object):
             opcode = OPCODE_MAP[parts[0].upper()]
             val = parts[-1]
             if opcode in OP_JUMPS:
-                label_map[val] = len(lines)
-                lines.append((opcode, len(lines)))
+                if val in label_map:
+                    target = label_map[val]
+                else:
+                    target = len(lines)
+                    label_map[val] = target
+                lines.append((opcode, target))
             elif OP_USEVAL[opcode]:
                 lines.append((opcode, int(val)))
             else:
@@ -626,6 +630,6 @@ class Compiler(object):
         self.debug = None
         self.lines = lines
         self.label_map = {}
-        for key in label_name_map.keys():
+        for key in label_map.keys():
             self.label_map[label_map[key]] = label_name_map[key]
 
