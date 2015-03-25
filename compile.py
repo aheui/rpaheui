@@ -87,7 +87,7 @@ class Debug(object):
     def _list(self, list):
         items = []
         node = list.head
-        while node.next:
+        while node:
             items.append(str(node.value))
             node = node.next
         return '[' + ', '.join(items) + ']'
@@ -439,16 +439,29 @@ class Compiler(object):
         assert -1 not in queue_map
 
         reachability = [1] * len(lines)
+        for i in range(1, len(lines)):
+            op, val = lines[i]
+            i1 = i - 1
+            while lines[i1][0] == OP_NONE and i1 >= 0:
+                i1 -= 1
+            if queue_map[i] or queue_map[i1]:
+                continue
+            if op == OP_DUP:
+                inst1 = lines[i1]
+                if inst1[0] == OP_PUSH:
+                    lines[i] = lines[i1]
+                continue
+
         for i in range(2, len(lines)):
             op, val = lines[i]
-            if op not in [OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_CMP]:
-                continue
             i1 = i - 1
             while lines[i1][0] == OP_NONE and i1 >= 1:
                 i1 -= 1
             i2 = i1 - 1
             while lines[i1][0] == OP_NONE and i2 >= 0:
                 i2 -= 1
+            if op not in [OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_CMP]:
+                continue
             if queue_map[i] or queue_map[i1] or queue_map[i2]:
                 continue
             inst1 = lines[i1]

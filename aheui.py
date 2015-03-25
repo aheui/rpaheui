@@ -52,37 +52,37 @@ class Stack(object):
     """Base data storage for Aheui, except for ieung and hieuh."""
 
     def __init__(self):
-        self.head = Link(None)
+        self.head = None
         self.size = 0
 
     def push(self, value):
-        node = Link(self.head.next, value)
-        self.head.next = node
+        node = Link(self.head, value)
+        self.head = node
         self.size += 1
 
     def pop(self):
-        node = self.head.next
+        node = self.head
+        self.head = node.next
         value = node.value
-        self.size -= 1
-        self.head.next = node.next
         del node
+        self.size -= 1
         return value
 
     def dup(self):
-        self.push(self.head.next.value)
+        self.push(self.head.value)
 
     def swap(self):
-        node1 = self.head.next
+        node1 = self.head
         node2 = node1.next
         node1.value, node2.value = node2.value, node1.value
 
     # Tools for common methods. inline?
 
     def get_2_values(self):
-        return self.pop(), self.head.next.value
+        return self.pop(), self.head.value
 
     def put_value(self, value):
-        self.head.next.value = value
+        self.head.value = value
 
     # Common methods from here
 
@@ -124,7 +124,7 @@ class Queue(Stack):
 
     def __init__(self):
         self.tail = Link(None)
-        self.head = Link(self.tail)
+        self.head = self.tail
         self.size = 0
 
     def push(self, value):
@@ -137,9 +137,8 @@ class Queue(Stack):
 
     def dup(self):
         head = self.head
-        value = head.next.value
-        node = Link(head.next, value)
-        head.next = node
+        node = Link(head, head.value)
+        self.head = node
         self.size += 1
 
     def get_2_values(self):
