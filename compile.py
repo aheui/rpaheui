@@ -636,17 +636,22 @@ class Compiler(object):
             parts = main.split(' ')
             opcode = OPCODE_MAP[parts[0].upper()]
             val = parts[-1]
-            if opcode in OP_JUMPS:
-                if val in label_map:
-                    target = label_map[val]
+            try:
+                if opcode in OP_JUMPS:
+                    if val in label_map:
+                        target = label_map[val]
+                    else:
+                        target = len(lines)
+                        label_map[val] = target
+                    lines.append((opcode, target))
+                elif OP_USEVAL[opcode]:
+                    val = int(val)
+                    lines.append((opcode, int(val)))
                 else:
-                    target = len(lines)
-                    label_map[val] = target
-                lines.append((opcode, target))
-            elif OP_USEVAL[opcode]:
-                lines.append((opcode, int(val)))
-            else:
-                lines.append((opcode, -1))
+                    lines.append((opcode, -1))
+            except Exception, e:
+                os.write(2, "parsing error: ln%d %s\n" % (len(lines), main))
+                raise
         self.debug = None
         self.lines = lines
         self.label_map = {}
