@@ -263,7 +263,8 @@ class Compiler(object):
 
                 op, mv, val = primitive.decode(position)
                 new_direction, step = dir_from_mv(mv, direction)
-
+                if mv in [MV_DOWN, MV_DOWN2, MV_UP, MV_UP2, MV_LEFT, MV_LEFT2, MV_RIGHT, MV_RIGHT2]:
+                    direction = new_direction
                 if (position, direction) in code_map:
                     index = code_map[position, direction]
                     posdir = position, direction + 10
