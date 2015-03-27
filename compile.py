@@ -25,7 +25,7 @@ OPCODE_NAMES = [None, None, 'DIV', 'ADD', 'MUL', 'MOD', 'POP', 'PUSH', 'DUP', 'S
 OP_HASOP = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 OP_USEVAL = [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
 VAL_CONSTS = [0, 2, 4, 4, 2, 5, 5, 3, 5, 7, 9, 9, 7, 9, 9, 8, 4, 4, 6, 2, 4, 1, 3, 4, 3, 4, 4, 3]
-
+#             () ㄱ ㄲ ㄳ ㄴ ㄵ ㄶ ㄷ ㄹ ㄺ ㄻ ㄼ ㄽ ㄾ ㄿ ㅀ ㅁ ㅂ ㅄ ㅅ ㅆ ㅇ ㅈ ㅊ ㅋ ㅌ ㅍ ㅎ
 
 VAL_NUMBER = 21
 VAL_UNICODE = 27
@@ -53,46 +53,48 @@ MV_HWALL = 18 # ㅡ
 MV_WALL = 19 # ㅢ
 MV_VWALL = 20 # ㅣ
 
+MV_DETERMINISTICS = [MV_DOWN, MV_DOWN2, MV_UP, MV_UP2, MV_LEFT, MV_LEFT2, MV_RIGHT, MV_RIGHT2]
+
+DIR_NAMES = [None, 'D', 'R', 'LJMP', 'UJMP', None, 'DJMP', 'RJMP', 'LBR', 'UBR', None, 'DBR', 'RBR', 'L', 'U']
+
+DIR_DOWN = 1
+DIR_RIGHT = 2
+DIR_UP = -1
+DIR_LEFT = -2
+
 
 class Debug(object):
     ENABLED = DEBUG
 
-    def __init__(self, primitive, serialized, code_map):
-        self.primitive = primitive
-        self.serialized = serialized
-        self.code_map = code_map
-        self.inv_map = {}
-        for k, v in self.code_map.items():
-            try:
-                self.inv_map[v].append(k)
-            except:
-                self.inv_map[v] = [k]
+    def __init__(self, lines, comments=None):
+        self.lines = lines
+        self.comments = comments
+
+    def build_comments(self, primitive, code_map):
+        self.comments = []
+        for i in range(0, len(self.lines)):
+            self.comments.append([])
+        for (pos, dir), i in code_map.items():
+            self.comments[i].append(primitive.pane[pos].encode('utf-8'))
+            self.comments[i].append('%s %s' % (pos, DIR_NAMES[dir]))
+
+    def comment(self, i):
+        return ' '.join(self.comments[i])
 
     def show(self, pc, fp=2):
-        op, value = self.serialized[pc]
-        positions = self.inv_map.get(pc, [])
-        if not positions:
-            os.write(fp, (u'%d X %s(%s) %s\n' % (pc, OPCODE_NAMES[op], unichr(0x1100 + op), value)).encode('utf-8'))
-        for position in positions:
-            char = self.primitive.pane[position[0]]
-            os.write(fp, (u'%d %s %s(%s) %s # %s\n' % (pc, char, OPCODE_NAMES[op], unichr(0x1100 + op), value, position)).encode('utf-8'))
-
-    def dump(self, fp=2):
-        keys = sorted(self.inv_map.keys())
-        for k in keys:
-            pos = self.inv_map[k]
-            char = self.primitive.pane[pos[0][0]]
-            os.write(fp, (u'%d %s\n' % (k, char)).encode('utf-8'))
-
-    def _list(self, list):
-        items = []
-        node = list.head
-        while node:
-            items.append(str(node.value))
-            node = node.next
-        return '[' + ', '.join(items) + ']'
+        op, value = self.lines[pc]
+        os.write(fp, (u'%d X %s(%s) %s ;' % (pc, OPCODE_NAMES[op], unichr(0x1100 + op), value)).encode('utf-8'))
+        os.write(fp, self.comment(pc))
+        os.write(fp, '\n')
 
     def storage(self, storage, selected=None):
+        def _list(list):
+            items = []
+            node = list.head
+            while node:
+                items.append(str(node.value))
+                node = node.next
+            return '[' + ', '.join(items) + ']'
         for i, l in enumerate(storage):
             marker = u':' if l == selected else u' '
             os.write(2, (u'%s (%d):%s' % (unichr(0x11a8 + i - 1), i, marker)).encode('utf-8'))
@@ -160,11 +162,6 @@ class PrimitiveProgram(object):
             assert False
 
         
-DIR_DOWN = 1
-DIR_RIGHT = 2
-DIR_UP = -1
-DIR_LEFT = -2
-
 def dir_from_mv(mv_code, direction):
     if mv_code == MV_RIGHT:
         return DIR_RIGHT, 1
@@ -230,7 +227,8 @@ class Compiler(object):
         primitive = PrimitiveProgram(program)
 
         self.lines, self.label_map, code_map = self.serialize(primitive)
-        self.debug = Debug(primitive, self.lines, code_map)
+        self.debug = Debug(self.lines)
+        self.debug.build_comments(primitive, code_map)
 
     def serialize(self, primitive):
         """Serialize Aheui primitive codes.
@@ -263,12 +261,12 @@ class Compiler(object):
 
                 op, mv, val = primitive.decode(position)
                 new_direction, step = dir_from_mv(mv, direction)
-                if mv in [MV_DOWN, MV_DOWN2, MV_UP, MV_UP2, MV_LEFT, MV_LEFT2, MV_RIGHT, MV_RIGHT2]:
+                if mv in MV_DETERMINISTICS:
                     direction = new_direction
                 if (position, direction) in code_map:
                     index = code_map[position, direction]
                     posdir = position, direction + 10
-                    code_map[position, direction + 20] = len(lines)
+                    #code_map[position, direction + 5] = len(lines)
                     if posdir in code_map:
                         target = code_map[posdir]
                     else:
@@ -303,7 +301,7 @@ class Compiler(object):
                         lines.append((op, VAL_CONSTS[val]))
                     elif op == OP_BRZ:
                         idx = len(lines)
-                        code_map[position, direction + 10] = idx
+                        #code_map[position, direction + 10] = idx
                         lines.append((OP_BRZ, idx))
                         alt_position = primitive.advance_position(position, -direction, step)
                         job_queue.append((alt_position, -direction, idx))
@@ -312,7 +310,7 @@ class Compiler(object):
                         if req_size > 0:
                             brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
                             idx = len(lines)
-                            code_map[position, direction + 10] = idx
+                            #code_map[position, direction + 10] = idx
                             code_map[position, direction] = idx + 1
                             lines.append((brop, idx))
                             if OP_USEVAL[op]:
@@ -336,11 +334,53 @@ class Compiler(object):
 
         Do not decouple each steps or change the order. It is important.
         """
+        self.optimize_jump()
         reachability = self.optimize_reachability()
         self.optimize_adjust(reachability)
 
         reachability = self.optimize_operation()
+        self.optimize_jump()
         self.optimize_adjust(reachability)
+
+
+    def optimize_adjust(self, reachability):
+        useless_map = [0] * len(reachability)
+        count = 0
+        for i, reachable in enumerate(reachability):
+            useless_map[i] = count
+            if not reachable:
+                count += 1
+
+        new = []
+        new_comments = []
+        new_label_map = {}
+        comments_buffer = []
+        for i, (op, val) in enumerate(self.lines):
+            if not reachability[i]:
+                if self.debug:
+                    comments_buffer += self.debug.comments[i]
+                continue
+            new.append((op, val))
+            new_comments.append([])
+            if op in OP_JUMPS:
+                target_idx = self.label_map[val]
+                new_label_map[val] = target_idx - useless_map[target_idx]
+            if self.debug:
+                new_comments[-1] += comments_buffer + self.debug.comments[i]
+                comments_buffer = []
+
+        self.lines = new
+        self.label_map = new_label_map
+        if self.debug:
+            new_debug = Debug(new, new_comments)
+            self.debug = new_debug
+
+    def optimize_jump(self):
+        for label, direct_target in self.label_map.items():
+            op, operand = self.lines[direct_target]
+            if op == OP_JMP:
+                indirect_target = self.label_map[operand]
+                self.label_map[label] = indirect_target
 
     def optimize_reachability(self):
         """Optimize codes by removing unreachable codes.
@@ -348,31 +388,33 @@ class Compiler(object):
         Because unreachable path is already removed by `serialize`, this path
         mainly remove useless OP_BRPOPs and its branches.
 
-        1. Remove indirect jumps.
-        2. Trace current stack size from first line.
-        3. If there is enough stack, do not trace OP_BRPOPs' jumps.
-        4. If optimizer met OP_SEL, assume stacksize is 0 from there.
-        5. If optimizer passes same codes,
+        1. Trace current stack size from first line.
+        2. If there is enough stack, do not trace OP_BRPOPs' jumps.
+        3. If optimizer met OP_SEL, assume stacksize is 0 from there.
+        4. If optimizer passes same codes,
             1. If assumed stacksize is smaller than before, keep going to trace.
             2. Otherwise it is not worth to do. Stop.
-        6. Stop if OP_HALT.
-        7. Drop useless OP_BRPOPs and any codes out of path.
+        5. Stop if OP_HALT.
+        6. Drop useless OP_BRPOPs and any codes out of path.
         """
-        for label, direct_target in self.label_map.items():
-            op, operand = self.lines[direct_target]
-            if op == OP_JMP:
-                indirect_target = self.label_map[operand]
-                self.label_map[label] = indirect_target
 
-        minstack_map = [-1] * len(self.lines)
-        job_queue = [(0, 0)]
+        minstack_map = [[-1] * STORAGE_COUNT] * len(self.lines)
+        job_queue = [(0, 0, [0] * STORAGE_COUNT)]
+
+        def min_list(l1, l2):
+            if l1[0] == -1:
+                return l2[:]
+            return [min(l1[i], l2[i]) for i in range(0, STORAGE_COUNT)]
+
         while len(job_queue) > 0:
-            pc, stacksize = job_queue.pop(0) 
+            pc, selected, stacksizes = job_queue.pop(0)
             while pc < len(self.lines):
+                stacksize = stacksizes[selected]
                 assert stacksize >= 0
                 op, val = self.lines[pc]
-                if minstack_map[pc] >= 0:
-                    if minstack_map[pc] <= stacksize:
+                minstacks = minstack_map[pc]
+                if minstacks[selected] >= 0:
+                    if minstacks[selected] <= stacksizes[selected] - OP_STACKDEL[op] + OP_STACKADD[op] and min_list(minstacks, stacksizes) == minstacks:
                         break
                 if op == OP_BRPOP1 or op == OP_BRPOP2:
                     reqsize = OP_REQSIZE[op]
@@ -380,29 +422,30 @@ class Compiler(object):
                         pc += 1
                         continue
                     else:
-                        minstack_map[pc] = stacksize
-                        job_queue.append((self.label_map[val], stacksize))
-                elif op == OP_BRZ:
-                    stacksize -= 1
-                    if stacksize < 0: stacksize = 0
-                    minstack_map[pc] = stacksize
-                    job_queue.append((self.label_map[val], stacksize))
-                elif op == OP_JMP:
-                    minstack_map[pc] = stacksize
-                    pc = self.label_map[val]
-                    continue
+                        minstack_map[pc] = min_list(minstacks, stacksizes)
+                        job_queue.append((self.label_map[val], selected, stacksizes[:]))
                 else:
-                    minstack_map[pc] = stacksize
+                    minstack_map[pc] = min_list(minstacks, stacksizes)
                     stacksize -= OP_STACKDEL[op]
-                    if stacksize < 0: stacksize = 0
-                    stacksize += OP_STACKADD[op]
-                    if op == OP_SEL:
+                    if stacksize < 0:
                         stacksize = 0
+                    stacksize += OP_STACKADD[op]
+                    stacksizes[selected] = stacksize
+                    if op == OP_BRZ:
+                        job_queue.append((self.label_map[val], selected, stacksizes[:]))
+                    elif op == OP_JMP:
+                        pc = self.label_map[val]
+                        continue
+                    elif op == OP_SEL:
+                        minstack_map[pc] = min_list(minstacks, stacksizes)
+                        selected = val
+                    elif op == OP_MOV:
+                        stacksizes[val] += 1
                     elif op == OP_HALT:
                         break
                 pc += 1
 
-        reachability = [int(minstack >= 0) for minstack in minstack_map]
+        reachability = [int(minstacks[0] >= 0) for minstacks in minstack_map]
         return reachability
 
     def optimize_operation(self):
@@ -451,6 +494,12 @@ class Compiler(object):
         assert -1 not in queue_map
 
         label_targets = self.label_map.values()
+        label_rmap = {}
+        for k, v in self.label_map.items():
+            if v in label_rmap:
+                label_rmap[v] = -1
+            else:
+                label_rmap[v] = k
 
         reachability = [1] * len(lines)
         for i in range(1, len(lines)):
@@ -460,7 +509,7 @@ class Compiler(object):
                 i1 -= 1
             if queue_map[i] or queue_map[i1]:
                 continue
-            if i in label_targets or i1 in label_targets:
+            if i in label_targets:
                 continue
             if op == OP_DUP:
                 inst1 = lines[i1]
@@ -468,31 +517,7 @@ class Compiler(object):
                     lines[i] = lines[i1]
                 continue
 
-        for i in range(2, len(lines)):
-            op, val = lines[i]
-            i1 = i - 1
-            while lines[i1][0] == OP_NONE and i1 >= 1:
-                i1 -= 1
-            i2 = i1 - 1
-            while lines[i1][0] == OP_NONE and i2 >= 0:
-                i2 -= 1
-            if op not in [OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_CMP]:
-                continue
-            if queue_map[i] or queue_map[i1] or queue_map[i2]:
-                continue
-            if i in label_targets or i1 in label_targets or i2 in label_targets:
-                continue
-            inst1 = lines[i1]
-            inst2 = lines[i2]
-            if not inst2[0] == OP_PUSH:
-                continue
-            v2 = inst2[1]
-            if inst1[0] == OP_PUSH:
-                v1 = inst1[1]
-            elif inst1[0] == OP_DUP:
-                v1 = v2
-            else:
-                continue
+        def merge_binary(op, v1, v2):
             if op == OP_ADD:
                 v = v2 + v1
             elif op == OP_SUB:
@@ -507,44 +532,76 @@ class Compiler(object):
                 v = int(v2 >= v1)
             else:
                 assert False
-            lines[i] = (OP_PUSH, v)
-            lines[i1] = (OP_NONE, -1)
-            lines[i2] = (OP_NONE, -1)
-            reachability[i1] = 0
-            reachability[i2] = 0
+            return v
+
+        def merge_operations(i, lines, debug=False):
+            op, v = lines[i]
+            i1 = i - 1
+            while lines[i1][0] == OP_NONE and i1 >= 1:
+                i1 -= 1
+            i2 = i1 - 1
+            while lines[i1][0] == OP_NONE and i2 >= 0:
+                i2 -= 1
+            if queue_map[i] or queue_map[i1] or queue_map[i2]:
+                return False
+            if i1 in label_targets:
+                return False
+            op1, v1 = lines[i1]
+            op2, v2 = lines[i2]
+            if not op2 == OP_PUSH:
+                return False
+            if op1 == OP_PUSH:
+                pass
+            elif op1 == OP_DUP:
+                v1 = v2
+            else:
+                return False
+            if i in label_targets: # TODO:
+                return False
+            is_jmp = op == OP_JMP
+            if is_jmp:
+                jv = v
+                target = self.label_map[jv]
+                if label_rmap[target] == jv:
+                    op, v = lines[target]
+            if op not in OP_BINARYOPS:
+                return False
+            v = merge_binary(op, v1, v2)
+            if is_jmp:
+                lines[i1] = (OP_PUSH, v)
+                lines[i2] = (OP_NONE, -1)
+                reachability[i2] = 0
+                self.label_map[jv] += 1
+                del label_rmap[target]
+                if target + 1 in label_rmap:
+                    label_rmap[target + 1] = -1
+                else:
+                    label_rmap[target + 1] = jv
+                if self.debug:
+                    self.debug.comments[i1] += self.debug.comments[target]
+                job_queue.append(target)
+            else:
+                lines[i] = (OP_PUSH, v)
+                lines[i1] = (OP_NONE, -1)
+                lines[i2] = (OP_NONE, -1)
+                reachability[i1] = 0
+                reachability[i2] = 0
+            return True
+
+        job_queue = []
+        for i in range(2, len(lines)):
+            merge_operations(i, lines)
+                
+        while job_queue:
+            label_targets = self.label_map.values()
+            job = job_queue[0]
+            r = merge_operations(job, lines, debug=True)
+            if r:
+                job_queue[0] += 1
+            else:
+                job_queue.pop(0)
+
         return reachability
-
-
-    def optimize_adjust(self, reachability):
-        useless_map = [0] * len(reachability)
-        count = 0
-        for i, reachable in enumerate(reachability):
-            useless_map[i] = count
-            if not reachable:
-                count += 1
-        
-        new = []
-        code_map = {}
-        new_label_map = {}
-        for i, (op, val) in enumerate(self.lines):
-            if not reachability[i]:
-                continue
-            new.append((op, val))
-            if op in OP_JUMPS:
-                target_idx = self.label_map[val]
-                new_label_map[val] = target_idx - useless_map[target_idx]
-            if self.debug and i in self.debug.inv_map:
-                keys = self.debug.inv_map[i]
-                useless_count = useless_map[i]
-                for key in keys:
-                    code_map[key] = i - useless_count
-
-        self.lines = new
-        self.label_map = new_label_map
-        if self.debug:
-            new_debug = Debug(self.debug.primitive, new, code_map) # wrong
-            self.debug = new_debug
-
 
     def write(self, fp=1):
         """Write bytecodes down for given fp."""
@@ -582,7 +639,6 @@ class Compiler(object):
             if op in OP_JUMPS:
                 self.label_map[val] = val 
 
-
     def write_asm(self, fp=1):
         """Write assembly representation with comments."""
         label_revmap = {}
@@ -599,16 +655,7 @@ class Compiler(object):
                     code_val = '%s %s' % (code, val)
             else:
                 code_val = code
-            if self.debug and i in self.debug.inv_map:
-                debug_infos = []
-                for posdir in self.debug.inv_map[i]:
-                    position, direction = posdir
-                    syllable = self.debug.primitive.pane[position].encode('utf-8')
-                    debug_infos.append(' %s %s %d' % (syllable, position, direction))
-                debug_info = ''.join(debug_infos)
-            else:
-                debug_info = ''
-            os.write(fp, '\t%s\t; L%d%s\n' % (code_val, i, debug_info))
+            os.write(fp, '\t%s\t; L%d %s\n' % (code_val, i, self.debug.comment(i)))
 
     def read_asm(self, fp=0):
         """Read assembly representation."""
@@ -631,8 +678,12 @@ class Compiler(object):
         text = ''.join(text_fragments)
 
         lines = []
+        comments = []
         for row in text.split('\n'):
-            main = row.split(';')[0]
+            if ';' in row:
+                main, comment = row.split(';', 1)
+            else:
+                main, comment = row, ''
             if ':' in main:
                 label, main = main.split(':')
                 label = label.strip()
@@ -656,12 +707,13 @@ class Compiler(object):
                     lines.append((opcode, int(val)))
                 else:
                     lines.append((opcode, -1))
+                comments.append([comment])
             except Exception, e:
                 os.write(2, "parsing error: ln%d %s\n" % (len(lines), main))
                 raise
-        self.debug = None
         self.lines = lines
         self.label_map = {}
         for key in label_map.keys():
             self.label_map[label_map[key]] = label_name_map[key]
+        self.debug = Debug(lines, comments)
 

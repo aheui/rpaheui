@@ -157,7 +157,7 @@ class Storage(object):
 
     def __init__(self):
         pools = []
-        for i in range(0, 28):
+        for i in range(0, STORAGE_COUNT):
             if i == VAL_QUEUE:
                 pools.append(Queue())
             elif i == VAL_PORT:
@@ -247,7 +247,7 @@ class Program(object):
 
 
 def mainloop(program, debug):
-    set_param(None, 'trace_limit', 30000)
+    set_param(None, 'trace_limit', 20000)
     assert_green(program)
     pc = 0
     stacksize = 0

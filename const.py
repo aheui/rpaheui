@@ -2,11 +2,12 @@
 # coding: utf-8
 
 OP_REQSIZE = [0, 0, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 2, 0, 1, 1, 0, 0, 2, 1, 0]
-OP_STACKDEL = [0, 0, 2, 2, 2, 2, 1, 0, 1,-1, 1, 0, 2, 0, 1, 0, 2, 2, 0, 1, 1, 0, 0, 0, 0, 0]
+OP_STACKDEL = [0, 0, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 2, 0, 1, 1, 0, 0, 0, 0, 0]
 OP_STACKADD = [0, 0, 1, 1, 1, 1, 0, 1, 2, 0, 0, 0, 1, 0, 0, 0, 1, 2, 0, 0, 0, 1, 1, 0, 0, 0]
 
 VAL_QUEUE = 21
 VAL_PORT = 27
+STORAGE_COUNT = 28
 
 # ㄱ
 # ㄲ
@@ -38,4 +39,5 @@ OP_JMP = -1 # special
 
 OP_BRANCHES = [OP_BRZ, OP_BRPOP1, OP_BRPOP2]
 OP_JUMPS = OP_BRANCHES + [OP_JMP]
+OP_BINARYOPS = [OP_DIV, OP_ADD, OP_MUL, OP_MOD, OP_CMP, OP_SUB]
 
