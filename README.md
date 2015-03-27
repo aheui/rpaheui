@@ -64,8 +64,8 @@ Primitives
 - pushchar: ㅂ with ㅎ
 - dup: ㅃ
 - swap: ㅍ
-- sel: ㅅ
-- mov: ㅆ
+- sel $v: ㅅ. $v is always an integer order of final consonants.
+- mov $v: ㅆ. $v is always an integer order of final consonants.
 - cmp: ㅈ
 - brz $v: ㅊ. If a popped value is zero, program counter is set to $v; otherwise +1.
 
