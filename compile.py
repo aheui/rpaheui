@@ -23,7 +23,7 @@ except ImportError:
 OPCODE_NAMES = [None, None, 'DIV', 'ADD', 'MUL', 'MOD', 'POP', 'PUSH', 'DUP', 'SEL', 'MOV', None, 'CMP', None, 'BRZ', None, 'SUB', 'SWAP', 'HALT', 'POPNUM', 'POPCHAR', 'PUSHNUM', 'PUSHCHAR', 'BRPOP2', 'BRPOP1', 'JMP']
 
 OP_HASOP = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
-OP_USEVAL = [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
+OP_USEVAL = [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
 VAL_CONSTS = [0, 2, 4, 4, 2, 5, 5, 3, 5, 7, 9, 9, 7, 9, 9, 8, 4, 4, 6, 2, 4, 1, 3, 4, 3, 4, 4, 3]
 
 
@@ -586,7 +586,7 @@ class Compiler(object):
             code = OPCODE_NAMES[op]
             if code is None:
                 code = 'inst' + str(op)
-            if val != -1:
+            if OP_USEVAL[op]:
                 if op in OP_JUMPS:
                     code_val = '%s L%s' % (code, self.label_map[val])
                 else:
