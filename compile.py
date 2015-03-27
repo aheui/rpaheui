@@ -331,6 +331,17 @@ class Compiler(object):
                 position = primitive.advance_position(position, direction, step)
         return lines, label_map, code_map
 
+    def optimize(self):
+        """Optimize generated codes.
+
+        Do not decouple each steps or change the order. It is important.
+        """
+        reachability = self.optimize_reachability()
+        self.optimize_adjust(reachability)
+
+        reachability = self.optimize_operation()
+        self.optimize_adjust(reachability)
+
     def optimize_reachability(self):
         """Optimize codes by removing unreachable codes.
 
@@ -439,6 +450,8 @@ class Compiler(object):
                         break
         assert -1 not in queue_map
 
+        label_targets = self.label_map.values()
+
         reachability = [1] * len(lines)
         for i in range(1, len(lines)):
             op, val = lines[i]
@@ -446,6 +459,8 @@ class Compiler(object):
             while lines[i1][0] == OP_NONE and i1 >= 0:
                 i1 -= 1
             if queue_map[i] or queue_map[i1]:
+                continue
+            if i in label_targets or i1 in label_targets:
                 continue
             if op == OP_DUP:
                 inst1 = lines[i1]
@@ -464,6 +479,8 @@ class Compiler(object):
             if op not in [OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, OP_CMP]:
                 continue
             if queue_map[i] or queue_map[i1] or queue_map[i2]:
+                continue
+            if i in label_targets or i1 in label_targets or i2 in label_targets:
                 continue
             inst1 = lines[i1]
             inst2 = lines[i2]
@@ -516,28 +533,17 @@ class Compiler(object):
             if op in OP_JUMPS:
                 target_idx = self.label_map[val]
                 new_label_map[val] = target_idx - useless_map[target_idx]
-            if i in self.debug.inv_map:
+            if self.debug and i in self.debug.inv_map:
                 keys = self.debug.inv_map[i]
                 useless_count = useless_map[i]
                 for key in keys:
                     code_map[key] = i - useless_count
 
-        new_debug = Debug(self.debug.primitive, new, code_map) # wrong
         self.lines = new
         self.label_map = new_label_map
-        self.debug = new_debug
-
-
-    def optimize(self):
-        """Optimize generated codes.
-
-        Do not decouple each steps or change the order. It is important.
-        """
-        reachability = self.optimize_reachability()
-        self.optimize_adjust(reachability)
-
-        reachability = self.optimize_operation()
-        self.optimize_adjust(reachability)
+        if self.debug:
+            new_debug = Debug(self.debug.primitive, new, code_map) # wrong
+            self.debug = new_debug
 
 
     def write(self, fp=1):
