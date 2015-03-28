@@ -33,7 +33,7 @@ def get_location(pc, stackok, is_queue, program):
     """
     op = program.get_op(pc)
     val = program.get_operand(pc)
-    return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OPCODE_NAMES[op], val)
+    return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OP_NAMES[op], val)
 
 driver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
 
