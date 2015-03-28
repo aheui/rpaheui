@@ -79,7 +79,7 @@ class Debug(object):
             self.comments[i].append('%s %s' % (pos, DIR_NAMES[dir]))
 
     def comment(self, i):
-        return ' '.join(self.comments[i])
+        return ' / '.join(self.comments[i])
 
     def show(self, pc, fp=2):
         op, value = self.lines[pc]
@@ -266,7 +266,7 @@ class Compiler(object):
                 if (position, direction) in code_map:
                     index = code_map[position, direction]
                     posdir = position, direction + 10
-                    #code_map[position, direction + 5] = len(lines)
+                    code_map[position, direction + 5] = len(lines)
                     if posdir in code_map:
                         target = code_map[posdir]
                     else:
@@ -301,7 +301,7 @@ class Compiler(object):
                         lines.append((op, VAL_CONSTS[val]))
                     elif op == OP_BRZ:
                         idx = len(lines)
-                        #code_map[position, direction + 10] = idx
+                        code_map[position, direction + 10] = idx
                         lines.append((OP_BRZ, idx))
                         alt_position = primitive.advance_position(position, -direction, step)
                         job_queue.append((alt_position, -direction, idx))
@@ -310,7 +310,7 @@ class Compiler(object):
                         if req_size > 0:
                             brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
                             idx = len(lines)
-                            #code_map[position, direction + 10] = idx
+                            code_map[position, direction + 10] = idx
                             code_map[position, direction] = idx + 1
                             lines.append((brop, idx))
                             if OP_USEVAL[op]:
@@ -366,7 +366,12 @@ class Compiler(object):
                 target_idx = self.label_map[val]
                 new_label_map[val] = target_idx - useless_map[target_idx]
             if self.debug:
-                new_comments[-1] += comments_buffer + self.debug.comments[i]
+                comments = []
+                for comment in comments_buffer:
+                    if 'JMP' in comment:
+                        pass
+                    comments.append(comment)
+                new_comments[-1] += comments + self.debug.comments[i]
                 comments_buffer = []
 
         self.lines = new
@@ -517,24 +522,8 @@ class Compiler(object):
                     lines[i] = lines[i1]
                 continue
 
-        def merge_binary(op, v1, v2):
-            if op == OP_ADD:
-                v = v2 + v1
-            elif op == OP_SUB:
-                v = v2 - v1
-            elif op == OP_MUL:
-                v = v2 * v1
-            elif op == OP_DIV:
-                v = v2 / v1
-            elif op == OP_MOD:
-                v = v2 % v1
-            elif op == OP_CMP:
-                v = int(v2 >= v1)
-            else:
-                assert False
-            return v
 
-        def merge_operations(i, lines, debug=False):
+        def merge_operations(i, lines, label_targets, label_map, label_rmap, queue_map, reachability, job_queue, debug):
             op, v = lines[i]
             i1 = i - 1
             while lines[i1][0] == OP_NONE and i1 >= 1:
@@ -556,29 +545,45 @@ class Compiler(object):
                 v1 = v2
             else:
                 return False
-            if i in label_targets: # TODO:
+            if i in label_targets:
                 return False
             is_jmp = op == OP_JMP
             if is_jmp:
-                jv = v
-                target = self.label_map[jv]
-                if label_rmap[target] == jv:
+                target = label_map[v]
+                if label_rmap[target] == v:
                     op, v = lines[target]
             if op not in OP_BINARYOPS:
                 return False
-            v = merge_binary(op, v1, v2)
+
+            if op == OP_ADD:
+                v = v2 + v1
+            elif op == OP_SUB:
+                v = v2 - v1
+            elif op == OP_MUL:
+                v = v2 * v1
+            elif op == OP_DIV:
+                v = v2 / v1
+            elif op == OP_MOD:
+                v = v2 % v1
+            elif op == OP_CMP:
+                v = int(v2 >= v1)
+            else:
+                assert False
+
             if is_jmp:
                 lines[i1] = (OP_PUSH, v)
                 lines[i2] = (OP_NONE, -1)
                 reachability[i2] = 0
-                self.label_map[jv] += 1
+                jv = lines[i][1]
+                target = label_map[jv]
+                label_map[jv] += 1
                 del label_rmap[target]
                 if target + 1 in label_rmap:
                     label_rmap[target + 1] = -1
                 else:
                     label_rmap[target + 1] = jv
-                if self.debug:
-                    self.debug.comments[i1] += self.debug.comments[target]
+                if debug:
+                    debug.comments[i1] += debug.comments[target]
                 job_queue.append(target)
             else:
                 lines[i] = (OP_PUSH, v)
@@ -588,18 +593,20 @@ class Compiler(object):
                 reachability[i2] = 0
             return True
 
+
         job_queue = []
         for i in range(2, len(lines)):
-            merge_operations(i, lines)
+            merge_operations(i, lines, label_targets, self.label_map, label_rmap, queue_map, reachability, job_queue, self.debug)
                 
+        label_targets = self.label_map.values()
         while job_queue:
-            label_targets = self.label_map.values()
             job = job_queue[0]
-            r = merge_operations(job, lines, debug=True)
+            r = merge_operations(job, lines, label_targets, self.label_map, label_rmap, queue_map, reachability, job_queue, self.debug)
             if r:
                 job_queue[0] += 1
             else:
                 job_queue.pop(0)
+                label_targets = self.label_map.values()
 
         return reachability
 
@@ -716,4 +723,5 @@ class Compiler(object):
         for key in label_map.keys():
             self.label_map[label_map[key]] = label_name_map[key]
         self.debug = Debug(lines, comments)
+
 
