@@ -1,31 +1,9 @@
 #!/usr/bin/env python
 
-import os
-import compile
-
-def run(fp):
-    program_contents = ''
-    while True:
-        read = os.read(fp, 4096)
-        if len(read) == 0:
-            break
-        program_contents += read
-    os.close(fp)
-    assembler = compile.Compiler()
-    assembler.compile(program_contents)
-    assembler.optimize()
-    assembler.write_asm()
-    return 0
+import aheui
 
 def entry_point(argv):
-    try:
-        filename = argv[1]
-    except IndexError:
-        print 'filename'
-        return 1
-    fp = os.open(filename, os.O_RDONLY, 0777)
-    exitcode = run(fp)
-    return exitcode
+    return aheui.entry_point(argv + ['--target=asm', '--output=-'])
 
 def target(*args):
     return entry_point, None

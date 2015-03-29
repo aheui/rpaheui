@@ -4,6 +4,7 @@
 import os
 
 from const import *
+import _argparse
 import compile
 try:
     from rpython.rlib.jit import JitDriver
@@ -247,7 +248,7 @@ class Program(object):
 
 
 def mainloop(program, debug):
-    set_param(None, 'trace_limit', 20000)
+    set_param(driver, 'trace_limit', 30000)
     assert_green(program)
     pc = 0
     stacksize = 0
@@ -341,51 +342,108 @@ def mainloop(program, debug):
         return 0
 
 def entry_point(argv):
-    try:
-        filename = argv[1]
-    except IndexError:
-        print 'aheui: error: no input files'
+    parser = _argparse.parser
+    kwargs, args = parser.parse_args(argv)
+    if not args:
         return 1
-    
-    compiler = compile.Compiler()
+    if len(args) != 2:
+        os.write(2, 'aheui: error: no input files\n')
+        return 1
 
+    filename = args[1]
     if filename == '-':
         fp = 0
+        contents = compile.read(fp)
     else:
         fp = os.open(filename, os.O_RDONLY, 0777)
-    if filename.endswith('.aheuic'):
-        compiler.read(fp)
-    elif filename.endswith('.aheuis'):
-        compiler.read_asm(fp)
+        contents = compile.read(fp)
+        os.close(fp)
+
+    source = kwargs['source']
+    if source == 'auto':
+        if filename.endswith('.aheui'):
+            source = 'text'
+        elif filename.endswith('.aheuic'):
+            source = 'bytecode'
+        elif filename.endswith('.aheuis'):
+            source = 'asm'
+        elif '\xff\xff\xff\xff' in contents:
+            source = 'bytecode'
+        else:
+            source = 'text'
+
+    compiler = compile.Compiler()
+    if source == 'bytecode':
+        compiler.read_bytecode(contents)
+    elif source == 'asm':
+        compiler.read_asm(contents)
     else:
-        program_contents = ''
-        while True:
-            read = os.read(fp, 4096)
-            if len(read) == 0:
-                break
-            program_contents += read
- 
-        compiler.compile(program_contents)
-        compiler.optimize()
+        compiler.compile(contents)
 
-        if filename != '-':
-            binname = filename
-            if binname.endswith('.aheui'):
-                binname += 'c'
+    opt_level = int(kwargs['opt'])
+    if opt_level == 0:
+        pass
+    elif opt_level == 1:
+        compiler.optimize1()
+    elif opt_level == 2:
+        compiler.optimize2()
+    else:
+        assert False
+
+    target = kwargs['target']
+    if target == 'run' and kwargs['no-c'] == 'no' and filename != '-' and not filename.endswith('.aheuic'):
+        targetname = filename
+        if targetname.endswith('.aheui'):
+            targetname += 'c'
+        else:
+            targetname += '.aheuic'
+        try:
+            bfp = os.open(targetname, os.O_WRONLY|os.O_CREAT, 0644)
+            bytecode = compiler.write_bytecode()
+            asm = compiler.write_asm()
+            os.write(bfp, bytecode)
+            os.write(bfp, '\n\n')
+            os.write(bfp, asm)
+            os.close(bfp)
+        except:
+            pass
+
+    output = kwargs['output']
+    if output == '':
+        if target == 'bytecode':
+            output = filename
+            if output.endswith('.aheui'):
+                output += 'c'
             else:
-                binname += '.aheuic'
-            try:
-                bfp = os.open(binname, os.O_WRONLY|os.O_CREAT, 0644)
-                compiler.write(bfp)
-                os.write(bfp, '\n\n')
-                compiler.write_asm(bfp)
-                os.close(bfp)
-            except:
-                pass
-    os.close(fp)
+                output += '.aheuic'
+        elif target == 'asm':
+            output = filename
+            if output.endswith('.aheui'):
+                output += 's'
+            else:
+                output += '.aheuis'
+        elif target == 'run':
+            output = '-'
+        else:
+            assert False
 
-    program = Program(compiler.lines, compiler.label_map)
-    exitcode = mainloop(program, compiler.debug)
+    if target == 'run':
+        program = Program(compiler.lines, compiler.label_map)
+        exitcode = mainloop(program, compiler.debug)
+    elif target == 'asm':
+        outfp = 1 if output == '-' else os.open(output, os.O_WRONLY|os.O_CREAT, 0644)
+        asm = compiler.write_asm()
+        os.write(outfp, asm)
+        os.close(outfp)
+        exitcode = 0
+    elif target == 'bytecode':
+        outfp = 1 if output == '-' else os.open(output, os.O_WRONLY|os.O_CREAT, 0644)
+        bytecode = compiler.write_bytecode()
+        os.write(outfp, bytecode)
+        os.close(outfp)
+        exitcode = 0
+    else:
+        assert False
     return exitcode
 
 
