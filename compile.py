@@ -303,12 +303,6 @@ class Compiler(object):
 
                     if op == OP_PUSH:
                         lines.append((op, VAL_CONSTS[val]))
-                    elif op == OP_BRZ:
-                        idx = len(lines)
-                        code_map[position, direction + 10] = idx
-                        lines.append((OP_BRZ, idx))
-                        alt_position = primitive.advance_position(position, -direction, step)
-                        job_queue.append((alt_position, -direction, step, idx))
                     else:
                         req_size = OP_REQSIZE[op]
                         if req_size > 0:
@@ -318,7 +312,14 @@ class Compiler(object):
                             code_map[position, direction] = idx + 1
                             lines.append((brop, idx))
                             if OP_USEVAL[op]:
-                                lines.append((op, val))
+                                if op == OP_BRZ:
+                                    idx2 = len(lines)
+                                    code_map[position, direction + 10] = idx2
+                                    lines.append((OP_BRZ, idx2))
+                                    alt_position = primitive.advance_position(position, -direction, step)
+                                    job_queue.append((alt_position, -direction, step, idx2))
+                                else:
+                                    lines.append((op, val))
                             else:
                                 lines.append((op, -1))
                             alt_position = primitive.advance_position(position, -direction, step)
@@ -835,7 +836,8 @@ class Compiler(object):
             else:
                 code_val = code
             code_val = padding(code_val, 10)
-            codes.append('%s ; L%s %s\n' % (code_val, padding(str(i), 3), self.debug.comment(i)))
+            comment = self.debug.comment(i) if self.debug else ''
+            codes.append('%s ; L%s %s\n' % (code_val, padding(str(i), 3), comment))
         return ''.join(codes)
 
     def read_asm(self, text):
