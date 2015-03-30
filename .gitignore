@@ -2,3 +2,4 @@
 *.swp
 *.log
 *-c
+version.py

@@ -6,13 +6,19 @@ RPYTHONFLAGS=--opt=jit
 all: aheui-c
 	
 
-aheui-c:
+version:
+	echo "VERSION='`git describe --tags`'" > version.py
+
+aheui-c: version
 	$(RPYTHON) $(RPYTHONFLAGS) aheui.py
 
-install:
+clean:
+	rm aheui-c
+
+install: aheui-c
 	cp aheui-c /usr/local/bin/aheui
 
-ahsembler:
+ahsembler: version
 	$(RPYTHON) ahsembler.py
 
 test:

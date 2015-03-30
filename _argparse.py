@@ -1,4 +1,6 @@
 
+from version import VERSION
+
 class ParserError(Exception):
     __description__ = ''
 
@@ -17,6 +19,12 @@ class TooManyArgumentError(ParserError):
 class ArgumentNotInChoicesError(ParserError):
     __description__ = 'argument is not in choices: '
 
+class InformationException(ParserError):
+    __description__ = ''
+
+class HelpException(InformationException):
+    __description__ = ''
+
 class ArgumentParser(object):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -32,6 +40,10 @@ class ArgumentParser(object):
             kwargs['narg'] = '1'
         if 'choices' not in kwargs:
             kwargs['choices'] = ''
+        if 'description' not in kwargs:
+            kwargs['description'] = ''
+        if 'full_description' not in kwargs:
+            kwargs['full_description'] = ''
         self.arguments.append((names, kwargs))
 
     def _parse_args(self, args):
@@ -46,10 +58,16 @@ class ArgumentParser(object):
                 choices = opt['choices']
                 for name in list(names):
                     if arg.startswith(name):
-                        if opt['narg'] == '0':
+                        narg = int(opt['narg'])
+                        if narg <= 0:
                             idx += 1
                             parsed[dest] = 'yes'
                             done = True
+                            if narg < 0:
+                                if opt['dest'] == 'help':
+                                    raise HelpException('')
+                                else:
+                                    raise InformationException(opt['message'])
                         elif name.startswith('--'):
                             if '=' not in arg:
                                 raise TooFewArgumentError(name)
@@ -83,17 +101,48 @@ class ArgumentParser(object):
         return parsed, nonparsed
 
     def parse_args(self, args):
+        import os
         try:
             return self._parse_args(args)
+        except HelpException, e:
+            os.write(2, 'usage: %s [option] ... file\n\n' % self.kwargs.get('prog', args[0]))
+            for names, opt in self.arguments:
+                name = names[0] if names[0] == names[1] else ('%s,%s' % names[0:2])
+                os.write(2, '%s%s: %s' % (name, ' ' * (12 - len(name)), opt['description']))
+                if int(opt['narg']) > 0 and opt['default']:
+                    os.write(2, ' (default: %s)' % opt['default'])
+                if opt['choices']:
+                    os.write(2, ' (choices: %s)' % opt['choices'])
+                if opt['full_description']:
+                    os.write(2, '\n')
+                    os.write(2, opt['full_description'])
+                os.write(2, '\n')
+        except InformationException, e:
+            os.write(2, '%s\n' % e.desc)
         except ParserError, e:
             prog = self.kwargs.get('prog', args[0])
-            import os
             os.write(2, '%s: error: %s\n' % (prog, e.message()))
-            return {}, []
+        return {}, []
 
 parser = ArgumentParser(prog='aheui')
-parser.add_argument('--opt', '-O', default='1', choices='0,1,2')
-parser.add_argument('--source', '-S', default='auto', choices='auto,bytecode,asm,text')
-parser.add_argument('--target', '-T', default='run', choices='run,bytecode,asm')
-parser.add_argument('--output', '-o', default='')
-parser.add_argument('--no-c', '--no-c', narg='0', default='no', choices='yes,no')
+parser.add_argument('--opt', '-O', default='1', choices='0,1,2', description='Set optimization level.', full_description="""\t0: No optimization.
+\t1: Quickly resolve deadcode by rough stacksize emulation and merge constant operations.
+\t2: Perfectly resolve deadcode by stacksize emulation, reserialize code chunks and merge constant operations.
+""")
+parser.add_argument('--source', '-S', default='auto', choices='auto,bytecode,asm,text', description='Set source filetype.', full_description="""\t- `auto`: Guess the source type. `bytecode` if `.aheuic` or `End of bytecode` pattern in source. `asm` is `.aheuis`. `text` if `.aheui`. `text` is default.
+\t- `bytecode`: Aheui bytecode. (Bytecode representation of `ahsembly`.
+\t- `asm`: See `ahsembly`.
+\t- usage: `--source=asm`, `-Sbytecode` or `-S text`
+""")
+parser.add_argument('--target', '-T', default='run', choices='run,bytecode,asm', description='Set target filetype.', full_description="""\t- `run`: Run given code.
+\t- `bytecode`: Aheui bytecode. (Bytecode representation of `ahsembly`.
+\t- `asm`: See `ahsembly`.
+\t- usage: `--target=asm`, `-Tbytecode` or `-T run`
+""")
+parser.add_argument('--output', '-o', default='', description='Output file. Default is ``. See details for each target. If the value is `-`, it is standard output.', full_description="""\t- `run` target: This option is not availble and ignored.
+\t- `bytecode` target: Default value is `.aheuic`
+\t- `asm` target: Default value is `.aheuis`
+""")
+parser.add_argument('--no-c', '--no-c', narg='0', default='no', description='Do not generate `.aheuic` file automatically.', full_description='  What is .aheuic? https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35\n')
+parser.add_argument('--version', '-v', narg='-1', default='no', description='Show program version', message=VERSION)
+parser.add_argument('--help', '-h', narg='-1', default='no', description='Show this help text')
