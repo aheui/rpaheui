@@ -115,7 +115,7 @@ class Debug(object):
         for i, l in enumerate(storage):
             marker = u':' if l == selected else u' '
             os.write(2, (u'%s (%d):%s' % (unichr(0x11a8 + i - 1), i, marker)).encode('utf-8'))
-            os.write(2, ('%s\n' % self._list(l)))
+            os.write(2, ('%s\n' % _list(l)))
 
 
 class PrimitiveProgram(object):
@@ -179,7 +179,7 @@ class PrimitiveProgram(object):
             assert False
 
         
-def dir_from_mv(mv_code, direction):
+def dir_from_mv(mv_code, direction, step):
     if mv_code == MV_RIGHT:
         return DIR_RIGHT, 1
     elif mv_code == MV_RIGHT2:
@@ -197,32 +197,19 @@ def dir_from_mv(mv_code, direction):
     elif mv_code == MV_DOWN2:
         return DIR_DOWN, 2
     elif mv_code == MV_WALL:
-        if direction == DIR_RIGHT:
-            return DIR_LEFT, 1
-        elif direction == DIR_LEFT:
-            return DIR_RIGHT, 1
-        elif direction == DIR_UP:
-            return DIR_DOWN, 1
-        elif direction == DIR_DOWN:
-            return DIR_UP, 1
-        else:
-            assert False
+        return -direction, step
     elif mv_code == MV_HWALL:
-        if direction == DIR_UP:
-            return DIR_DOWN, 1
-        elif direction == DIR_DOWN:
-            return DIR_UP, 1
+        if direction in [DIR_UP, DIR_DOWN]:
+            return -direction, step
         else:
-            return direction, 1
+            return direction, step
     elif mv_code == MV_VWALL:
-        if direction == DIR_RIGHT:
-            return DIR_LEFT, 1
-        elif direction == DIR_LEFT:
-            return DIR_RIGHT, 1
+        if direction in [DIR_RIGHT, DIR_LEFT]:
+            return -direction, step
         else:
-            return direction, 1
+            return direction, step
     else:
-        return direction, 1
+        return direction, step
 
 
 class Compiler(object):
@@ -262,13 +249,13 @@ class Compiler(object):
         4. If there is `OP_HALT`, go to next job in the queue.
         5. If `job_queue` is empty, drop any other instructions not on the path.
         """
-        job_queue = [((0, 0), DIR_DOWN, -1)]
+        job_queue = [((0, 0), DIR_DOWN, 1, -1)]
 
         lines = []
         label_map = {}
         code_map = {}
         while job_queue:
-            position, direction, marker = job_queue.pop()
+            position, direction, step, marker = job_queue.pop()
             if marker >= 0:
                 label_map[marker] = len(lines)
             while True:
@@ -277,7 +264,7 @@ class Compiler(object):
                     continue
 
                 op, mv, val = primitive.decode(position)
-                new_direction, step = dir_from_mv(mv, direction)
+                new_direction, step = dir_from_mv(mv, direction, step)
                 if mv in MV_DETERMINISTICS:
                     direction = new_direction
                 if (position, direction) in code_map:
@@ -321,7 +308,7 @@ class Compiler(object):
                         code_map[position, direction + 10] = idx
                         lines.append((OP_BRZ, idx))
                         alt_position = primitive.advance_position(position, -direction, step)
-                        job_queue.append((alt_position, -direction, idx))
+                        job_queue.append((alt_position, -direction, step, idx))
                     else:
                         req_size = OP_REQSIZE[op]
                         if req_size > 0:
@@ -335,7 +322,7 @@ class Compiler(object):
                             else:
                                 lines.append((op, -1))
                             alt_position = primitive.advance_position(position, -direction, step)
-                            job_queue.append((alt_position, -direction, idx))
+                            job_queue.append((alt_position, -direction, step, idx))
                         else:
                             if OP_USEVAL[op]:
                                 lines.append((op, val))
