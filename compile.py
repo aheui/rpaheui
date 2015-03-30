@@ -89,11 +89,11 @@ class Debug(object):
         self.comments = []
         for i in range(0, len(self.lines)):
             self.comments.append([])
-        for (pos, dir), i in code_map.items():
+        for (pos, dir, step), i in code_map.items():
             if dir >= 3:
                 continue
             self.comments[i].append(primitive.pane[pos].encode('utf-8'))
-            self.comments[i].append('[%s,%s] %s' % (padding(str(pos[0]), 3, left=False), padding(str(pos[1]), 3, left=False), padding(DIR_NAMES[dir], 5)))
+            self.comments[i].append('[%s,%s] %s%s' % (padding(str(pos[0]), 3, left=False), padding(str(pos[1]), 3, left=False), padding(DIR_NAMES[dir], 5), step))
 
     def comment(self, i):
         return ' / '.join(self.comments[i])
@@ -156,27 +156,25 @@ class PrimitiveProgram(object):
             if r > self.max_row:
                 r = 0
             p = r, c
-            return p
         elif d == DIR_RIGHT:
             c += step
             if c > self.max_col:
                 c = 0
             p = r, c
-            return p
         elif d == DIR_UP:
             r -= step
             if r < 0:
                 r = self.max_row
             p = r, c
-            return p
         elif d == DIR_LEFT:
             c -= step
             if c < 0:
                 c = self.max_col
             p = r, c
-            return p
         else:
             assert False
+        #print 'move:', position, '->', p, DIR_NAMES[direction], step
+        return p
 
         
 def dir_from_mv(mv_code, direction, step):
@@ -254,8 +252,16 @@ class Compiler(object):
         lines = []
         label_map = {}
         code_map = {}
+
+        def add(lines, op, operand, debug='unknown'):
+            idx = len(lines)
+            lines.append((op, operand))
+            #print idx, OP_NAMES[op], operand, debug
+            return idx
+
         while job_queue:
-            position, direction, step, marker = job_queue.pop()
+            position, direction, step, marker = job_queue.pop(0)
+            #print 'dequeue:', position, DIR_NAMES[direction], step, marker
             if marker >= 0:
                 label_map[marker] = len(lines)
             while True:
@@ -264,25 +270,27 @@ class Compiler(object):
                     continue
 
                 op, mv, val = primitive.decode(position)
-                new_direction, step = dir_from_mv(mv, direction, step)
+                new_direction, new_step = dir_from_mv(mv, direction, step)
                 if mv in MV_DETERMINISTICS:
                     direction = new_direction
-                if (position, direction) in code_map:
-                    index = code_map[position, direction]
-                    posdir = position, direction + 10
-                    code_map[position, direction + 5] = len(lines)
+                    step = new_step
+                if (position, direction, step) in code_map:
+                    index = code_map[position, direction, step]
+                    posdir = position, direction + 10, step
+                    code_map[position, direction + 5, step] = len(lines)
                     if posdir in code_map:
                         target = code_map[posdir]
                     else:
                         target = index
                     label_id = len(lines)
                     label_map[label_id] = target
-                    lines.append((OP_JMP, label_id))
+                    add(lines, OP_JMP, label_id, 'jump label for %s %s' % (position, direction))
                     break
 
-                code_map[position, direction] = len(lines)
+                code_map[position, direction, step] = len(lines)
 
                 direction = new_direction
+                step = new_step
                 if OP_HASOP[op]:
                     if op == OP_POP:
                         if val == VAL_NUMBER:
@@ -302,33 +310,34 @@ class Compiler(object):
                         pass
 
                     if op == OP_PUSH:
-                        lines.append((op, VAL_CONSTS[val]))
+                        add(lines, op, VAL_CONSTS[val])
                     else:
                         req_size = OP_REQSIZE[op]
                         if req_size > 0:
                             brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
                             idx = len(lines)
-                            code_map[position, direction + 10] = idx
-                            code_map[position, direction] = idx + 1
-                            lines.append((brop, idx))
+                            code_map[position, direction + 10, step] = idx  # mark branch
+                            add(lines, brop, idx, 'brpop')
+                            code_map[position, direction, step] = idx + 1  # mark code
                             if OP_USEVAL[op]:
                                 if op == OP_BRZ:
-                                    idx2 = len(lines)
-                                    code_map[position, direction + 10] = idx2
-                                    lines.append((OP_BRZ, idx2))
+                                    add(lines, op, idx, 'brpop-brz')
                                     alt_position = primitive.advance_position(position, -direction, step)
-                                    job_queue.append((alt_position, -direction, step, idx2))
+                                    #print 'enqueue:', alt_position, DIR_NAMES[-direction], step, idx
+                                    job_queue.append((alt_position, -direction, step, idx))
                                 else:
-                                    lines.append((op, val))
+                                    add(lines, op, val, 'brpop-useval')
                             else:
-                                lines.append((op, -1))
+                                add(lines, op, -1, 'brpop-noval')
+
                             alt_position = primitive.advance_position(position, -direction, step)
+                            #print 'enqueue:', alt_position, DIR_NAMES[-direction], step, idx
                             job_queue.append((alt_position, -direction, step, idx))
                         else:
                             if OP_USEVAL[op]:
-                                lines.append((op, val))
+                                add(lines, op, val, 'safe-useval')
                             else:
-                                lines.append((op, -1))
+                                add(lines, op, -1, 'safe-noval')
                                 if op == OP_HALT:
                                     break
                 position = primitive.advance_position(position, direction, step)
