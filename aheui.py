@@ -346,18 +346,26 @@ def entry_point(argv):
     kwargs, args = parser.parse_args(argv)
     if not args:
         return 1
-    if len(args) != 2:
-        os.write(2, 'aheui: error: no input files\n')
-        return 1
 
-    filename = args[1]
-    if filename == '-':
-        fp = 0
-        contents = compile.read(fp)
+    cmd = kwargs['cmd']
+    if cmd == '':
+        if len(args) != 2:
+            os.write(2, 'aheui: error: no input files\n')
+            return 1
+        filename = args[1]
+        if filename == '-':
+            fp = 0
+            contents = compile.read(fp)
+        else:
+            fp = os.open(filename, os.O_RDONLY, 0777)
+            contents = compile.read(fp)
+            os.close(fp)
     else:
-        fp = os.open(filename, os.O_RDONLY, 0777)
-        contents = compile.read(fp)
-        os.close(fp)
+        if len(args) != 1:
+            os.write(2, 'aheui: error: --cmd,-c but input file found\n')
+            return 1
+        contents = cmd
+        filename = '-'
 
     source = kwargs['source']
     if source == 'auto':
