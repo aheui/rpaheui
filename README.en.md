@@ -1,4 +1,4 @@
-RpAheui - Aheui rpython implementation
+RpAheui - Industrial-strength implementaiton of Aheui written in RPython
 ====
 
 * What is rpython?: [http://rpython.readthedocs.org][rpython]
@@ -46,6 +46,8 @@ sys	0m0.058s
 Options
 ----
 - First parameter after removing any options is filename. If the filename is `-`, it is standard input.
+- --help,-h: Show help
+- --version,-v: Show version
 - --opt,-O: Optimization level. Default is `1`. Any integer in `0`-`2` are available.
   - 0: No optimization.
   - 1: Quickly resolve deadcode by rough stacksize emulation and merge constant operations.
