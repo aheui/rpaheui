@@ -6,25 +6,7 @@ import os
 from const import *
 import _argparse
 import compile
-try:
-    from rpython.rlib.jit import JitDriver
-    from rpython.rlib.jit import elidable, dont_look_inside
-    from rpython.rlib.jit import assert_green
-    from rpython.rlib.jit import set_param, PARAMETERS
-    TRACE_LIMIT = PARAMETERS['trace_limit']
-except ImportError:
-    """Python compatibility."""
-    class JitDriver(object):
-        def __init__(self, **kw): pass
-        def jit_merge_point(self, **kw): pass
-        def can_enter_jit(self, **kw): pass
-    def elidable(f): return f
-    def dont_look_inside(f): return f
-    def unroll_safe(f): return f
-    def hint(v, **kw): return v
-    def assert_green(x): pass
-    def set_param(driver, name, value): pass
-    os.write(2, "[Warning] It is running without rlib/jit.\n")
+from _rpython import *
 
 
 def get_location(pc, stackok, is_queue, program):
@@ -48,6 +30,7 @@ class Link(object):
     def __init__(self, next, value=-1):
         self.value = value
         self.next = next
+
 
 class Stack(object):
     """Base data storage for Aheui, except for ieung and hieuh."""
@@ -202,8 +185,9 @@ def get_utf8():
                 else:
                     v = -1
     else:
-         v = -1
+        v = -1
     return v
+
 
 @dont_look_inside
 def get_number():
@@ -218,7 +202,6 @@ def get_number():
     assert len(numchars) > 0
     num = int(''.join(numchars))
     return num
-
 
 
 class Program(object):
@@ -256,9 +239,9 @@ def mainloop(program, debug):
     storage = Storage()
     selected = storage[0]
     while pc < program.size:
-        #debug.storage(storage, selected)
-        #raw_input()
-        #debug.show(pc)
+        #  debug.storage(storage, selected)
+        #  raw_input()
+        #  debug.show(pc)
         stackok = program.get_req_size(pc) <= stacksize
         driver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
         op = program.get_op(pc)
@@ -341,7 +324,11 @@ def mainloop(program, debug):
     else:
         return 0
 
+
 def entry_point(argv):
+    def open_w(filename):
+        os.open(filename, os.O_WRONLY | os.O_CREAT, 0644)
+
     parser = _argparse.parser
     kwargs, args = parser.parse_args(argv)
     if not args:
@@ -406,7 +393,7 @@ def entry_point(argv):
         else:
             targetname += '.aheuic'
         try:
-            bfp = os.open(targetname, os.O_WRONLY|os.O_CREAT, 0644)
+            bfp = open_w(targetname)
             bytecode = compiler.write_bytecode()
             asm = compiler.write_asm()
             os.write(bfp, bytecode)
@@ -439,13 +426,13 @@ def entry_point(argv):
         program = Program(compiler.lines, compiler.label_map)
         exitcode = mainloop(program, compiler.debug)
     elif target == 'asm':
-        outfp = 1 if output == '-' else os.open(output, os.O_WRONLY|os.O_CREAT, 0644)
+        outfp = 1 if output == '-' else open_w(output)
         asm = compiler.write_asm()
         os.write(outfp, asm)
         os.close(outfp)
         exitcode = 0
     elif target == 'bytecode':
-        outfp = 1 if output == '-' else os.open(output, os.O_WRONLY|os.O_CREAT, 0644)
+        outfp = 1 if output == '-' else open_w(output)
         bytecode = compiler.write_bytecode()
         os.write(outfp, bytecode)
         os.close(outfp)
@@ -459,11 +446,11 @@ def jitpolicy(driver):
     from rpython.jit.codewriter.policy import JitPolicy
     return JitPolicy()
 
-def target(*args):
-    return entry_point, None
+
+def target(*args): return entry_point, None
+
 
 if __name__ == '__main__':
     """Python compatibility."""
     import sys
     sys.exit(entry_point(sys.argv))
-

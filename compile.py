@@ -31,27 +31,27 @@ VAL_NUMBER = 21
 VAL_UNICODE = 27
 
 
-MV_RIGHT = 0 # ㅏ
+MV_RIGHT = 0  # ㅏ
 # ㅐ
-MV_RIGHT2 = 2 # ㅑ
+MV_RIGHT2 = 2  # ㅑ
 # ㅒ
-MV_LEFT = 4 # ㅓ
+MV_LEFT = 4  # ㅓ
 # ㅔ
-MV_LEFT2 = 6 # ㅕ
+MV_LEFT2 = 6  # ㅕ
 # ㅖ
-MV_UP = 8 # ㅗ
+MV_UP = 8  # ㅗ
 # ㅘ
 # ㅙ
 # ㅚ
-MV_UP2 = 12 # ㅛ
-MV_DOWN = 13 # ㅜ
+MV_UP2 = 12  # ㅛ
+MV_DOWN = 13  # ㅜ
 # ㅝ
 # ㅞ
 # ㅟ
-MV_DOWN2 = 17 # ㅠ
-MV_HWALL = 18 # ㅡ
-MV_WALL = 19 # ㅢ
-MV_VWALL = 20 # ㅣ
+MV_DOWN2 = 17  # ㅠ
+MV_HWALL = 18  # ㅡ
+MV_WALL = 19  # ㅢ
+MV_VWALL = 20  # ㅣ
 
 MV_DETERMINISTICS = [MV_DOWN, MV_DOWN2, MV_UP, MV_UP2, MV_LEFT, MV_LEFT2, MV_RIGHT, MV_RIGHT2]
 
@@ -68,6 +68,7 @@ def padding(s, l, left=True):
     padded = (s + spaces) if left else (spaces + s)
     return padded
 
+
 def read(fp=0):
     text_fragments = []
     while True:
@@ -77,6 +78,7 @@ def read(fp=0):
         text_fragments.append(buf)
     text = ''.join(text_fragments)
     return text
+
 
 class Debug(object):
     ENABLED = DEBUG
@@ -173,10 +175,10 @@ class PrimitiveProgram(object):
             p = r, c
         else:
             assert False
-        #print 'move:', position, '->', p, DIR_NAMES[direction], step
+        #  print 'move:', position, '->', p, DIR_NAMES[direction], step
         return p
 
-        
+
 def dir_from_mv(mv_code, direction, step):
     if mv_code == MV_RIGHT:
         return DIR_RIGHT, 1
@@ -256,16 +258,16 @@ class Compiler(object):
         def add(lines, op, operand, debug='unknown'):
             idx = len(lines)
             lines.append((op, operand))
-            #print idx, OP_NAMES[op], operand, debug
+            #  print idx, OP_NAMES[op], operand, debug
             return idx
 
         while job_queue:
             position, direction, step, marker = job_queue.pop(0)
-            #print 'dequeue:', position, DIR_NAMES[direction], step, marker
+            #  print 'dequeue:', position, DIR_NAMES[direction], step, marker
             if marker >= 0:
                 label_map[marker] = len(lines)
             while True:
-                if not position in primitive.pane:
+                if position not in primitive.pane:
                     position = primitive.advance_position(position, direction)
                     continue
 
@@ -323,7 +325,7 @@ class Compiler(object):
                                 if op == OP_BRZ:
                                     add(lines, op, idx, 'brpop-brz')
                                     alt_position = primitive.advance_position(position, -direction, step)
-                                    #print 'enqueue:', alt_position, DIR_NAMES[-direction], step, idx
+                                    #  print 'enqueue:', alt_position, DIR_NAMES[-direction], step, idx
                                     job_queue.append((alt_position, -direction, step, idx))
                                 else:
                                     add(lines, op, val, 'brpop-useval')
@@ -331,7 +333,7 @@ class Compiler(object):
                                 add(lines, op, -1, 'brpop-noval')
 
                             alt_position = primitive.advance_position(position, -direction, step)
-                            #print 'enqueue:', alt_position, DIR_NAMES[-direction], step, idx
+                            #  print 'enqueue:', alt_position, DIR_NAMES[-direction], step, idx
                             job_queue.append((alt_position, -direction, step, idx))
                         else:
                             if OP_USEVAL[op]:
@@ -390,7 +392,7 @@ class Compiler(object):
                 target_idx = self.label_map[val]
                 new_target_idx = target_idx - useless_map[target_idx]
                 new_label_map[val] = new_target_idx
-                #print 'remap:', target_idx, '->', new_target_idx
+                #  print 'remap:', target_idx, '->', new_target_idx
             if self.debug:
                 comments = []
                 for comment in comments_buffer:
@@ -575,9 +577,9 @@ class Compiler(object):
                     for label, dest in self.label_map.items():
                         if i <= dest <= ix:  # b2
                             self.label_map[label] += diff - 1
-                        elif ix < dest <= f: # b3
+                        elif ix < dest <= f:  # b3
                             self.label_map[label] -= size
-                        elif f < dest: # b4
+                        elif f < dest:  # b4
                             self.label_map[label] -= 1
                     b1 = lines[:i]
                     b2 = lines[i:ix + 1]
@@ -677,7 +679,6 @@ class Compiler(object):
             else:
                 label_rmap[v] = k
 
-
         reachability = [int(queue_map[i] >= 0) for i in range(0, len(lines))]
 
         if optimize_dup:
@@ -695,7 +696,6 @@ class Compiler(object):
                     if inst1[0] == OP_PUSH:
                         lines[i] = lines[i1]
                     continue
-
 
         for i in range(2, len(lines)):
             op, v = lines[i]
@@ -718,26 +718,26 @@ class Compiler(object):
             else:
                 continue
 
-            #print '----'
-            #print i, OP_NAMES[op2], OP_NAMES[op1], OP_NAMES[op]
-            #self.debug.show(i2)
-            #self.debug.show(i1)
-            #self.debug.show(i)
+            #  print '----'
+            #  print i, OP_NAMES[op2], OP_NAMES[op1], OP_NAMES[op]
+            #  self.debug.show(i2)
+            #  self.debug.show(i1)
+            #  self.debug.show(i)
 
             if queue_map[i] or queue_map[i1] or queue_map[i2]:
-                #print 'in queue'
+                #  print 'in queue'
                 continue
             if i1 in label_targets or i in label_targets:
-                #print 'has jump label'
+                #  print 'has jump label'
                 continue
             is_jmp = op == OP_JMP
             if is_jmp:
                 target = self.label_map[v]
-                #print v, target, label_rmap[target]
+                #  print v, target, label_rmap[target]
                 if label_rmap[target] == v:
                     op, v = lines[target]
             if op not in OP_BINARYOPS:
-                #print 'not binops'
+                #  print 'not binops'
                 continue
 
             if op == OP_ADD:
@@ -755,7 +755,7 @@ class Compiler(object):
             else:
                 assert False
 
-            #print 'optimized!'
+            #  print 'optimized!'
             if is_jmp:
                 lines[i1] = (OP_PUSH, v)
                 lines[i2] = (OP_NONE, -1)
@@ -770,16 +770,16 @@ class Compiler(object):
                     label_rmap[target + 1] = jv
                 if self.debug:
                     self.debug.comments[i1] += self.debug.comments[target]
-                #self.debug.show(i1)
-                #self.debug.show(i)
+                #  self.debug.show(i1)
+                #  self.debug.show(i)
             else:
                 lines[i] = (OP_PUSH, v)
                 lines[i1] = (OP_NONE, -1)
                 lines[i2] = (OP_NONE, -1)
                 reachability[i1] = 0
                 reachability[i2] = 0
-                #self.debug.show(i)
-                
+                #  self.debug.show(i)
+
         return reachability
 
     def write_bytecode(self):
@@ -788,7 +788,7 @@ class Compiler(object):
         for op, val in self.lines:
             if op in OP_JUMPS:
                 val = self.label_map[val]
-            if val >= 0: 
+            if val >= 0:
                 p_val = chr(val & 0xff) + chr((val & 0xff00) >> 8) + chr((val & 0xff0000) >> 16)
             else:
                 p_val = '\0\0\0'
@@ -820,7 +820,7 @@ class Compiler(object):
                 op -= 256
             self.lines.append((op, val))
             if op in OP_JUMPS:
-                self.label_map[val] = val 
+                self.label_map[val] = val
 
     def write_asm(self, fp=1):
         """Write assembly representation with comments."""
@@ -860,7 +860,7 @@ class Compiler(object):
             OPCODE_MAP[name] = opcode
         label_name_map = {}
         label_map = {}
-        
+
         lines = []
         comments = []
         for row in text.split('\n'):
@@ -900,4 +900,3 @@ class Compiler(object):
         for key in label_map.keys():
             self.label_map[label_map[key]] = label_name_map[key]
         self.debug = Debug(lines, comments)
-

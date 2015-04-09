@@ -1,6 +1,7 @@
 
 from version import VERSION
 
+
 class ParserError(Exception):
     __description__ = ''
 
@@ -10,20 +11,26 @@ class ParserError(Exception):
     def message(self):
         return self.__description__ + self.desc
 
+
 class TooFewArgumentError(ParserError):
     __description__ = 'too few arguments: '
+
 
 class TooManyArgumentError(ParserError):
     __description__ = 'too many arguments: '
 
+
 class ArgumentNotInChoicesError(ParserError):
     __description__ = 'argument is not in choices: '
+
 
 class InformationException(ParserError):
     __description__ = ''
 
+
 class HelpException(InformationException):
     __description__ = ''
+
 
 class ArgumentParser(object):
     def __init__(self, **kwargs):
