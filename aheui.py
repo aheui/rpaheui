@@ -16,9 +16,11 @@ def get_location(pc, stackok, is_queue, program):
     """
     op = program.get_op(pc)
     val = program.get_operand(pc)
-    return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OP_NAMES[op], val)
+    return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OP_NAMES[op].encode('utf-8'), val)
 
-driver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'], reds=['stacksize', 'storage', 'selected'], get_printable_location=get_location)
+driver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'],
+                   reds=['stacksize', 'storage', 'selected'],
+                   get_printable_location=get_location)
 
 
 DEBUG = False
@@ -40,6 +42,7 @@ class Stack(object):
         self.size = 0
 
     def push(self, value):
+        #assert(isinstance(value, int))
         node = Link(self.head, value)
         self.head = node
         self.size += 1
@@ -90,7 +93,7 @@ class Stack(object):
 
     def div(self):
         r1, r2 = self.get_2_values()
-        r = r2 / r1
+        r = r2 // r1
         self.put_value(r)
 
     def mod(self):
@@ -195,12 +198,12 @@ def get_number():
     numchars = []
     while True:
         numchar = os.read(0, 1)
-        if numchar not in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']:
+        if numchar not in [b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'0']:
             break
         else:
             numchars.append(numchar)
     assert len(numchars) > 0
-    num = int(''.join(numchars))
+    num = int(b''.join(numchars))
     return num
 
 
@@ -243,7 +246,9 @@ def mainloop(program, debug):
         #  raw_input()
         #  debug.show(pc)
         stackok = program.get_req_size(pc) <= stacksize
-        driver.jit_merge_point(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
+        driver.jit_merge_point(
+            pc=pc, stackok=stackok, is_queue=is_queue, program=program,
+            stacksize=stacksize, storage=storage, selected=selected)
         op = program.get_op(pc)
         assert_green(op)
         stacksize += - OP_STACKDEL[op] + OP_STACKADD[op]
@@ -283,18 +288,22 @@ def mainloop(program, debug):
                 value = program.get_label(pc)
                 pc = value
                 stackok = program.get_req_size(pc) <= stacksize
-                driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
+                driver.can_enter_jit(
+                    pc=pc, stackok=stackok, is_queue=is_queue, program=program,
+                    stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == OP_BRPOP1 or op == OP_BRPOP2:
             if not stackok:
                 value = program.get_label(pc)
                 pc = value
                 stackok = program.get_req_size(pc) <= stacksize
-                driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
+                driver.can_enter_jit(
+                    pc=pc, stackok=stackok, is_queue=is_queue, program=program,
+                    stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == OP_POPNUM:
             r = selected.pop()
-            os.write(1, str(r))
+            os.write(1, (u'%d' % r).encode('utf-8'))
         elif op == OP_POPCHAR:
             r = selected.pop()
             os.write(1, unichr(r).encode('utf-8'))
@@ -308,7 +317,9 @@ def mainloop(program, debug):
             value = program.get_label(pc)
             pc = value
             stackok = program.get_req_size(pc) <= stacksize
-            driver.can_enter_jit(pc=pc, stackok=stackok, is_queue=is_queue, program=program, stacksize=stacksize, storage=storage, selected=selected)
+            driver.can_enter_jit(
+                pc=pc, stackok=stackok, is_queue=is_queue, program=program,
+                stacksize=stacksize, storage=storage, selected=selected)
             continue
         elif op == OP_HALT:
             break
@@ -327,7 +338,10 @@ def mainloop(program, debug):
 
 def entry_point(argv):
     def open_w(filename):
-        os.open(filename, os.O_WRONLY | os.O_CREAT, 0644)
+        return os.open(filename, os.O_WRONLY | os.O_CREAT, 0o644)
+
+    def open_r(filename):
+        return os.open(filename, os.O_RDONLY, 0o777)
 
     parser = _argparse.parser
     kwargs, args = parser.parse_args(argv)
@@ -337,19 +351,19 @@ def entry_point(argv):
     cmd = kwargs['cmd']
     if cmd == '':
         if len(args) != 2:
-            os.write(2, 'aheui: error: no input files\n')
+            os.write(2, b'aheui: error: no input files\n')
             return 1
         filename = args[1]
         if filename == '-':
             fp = 0
             contents = compile.read(fp)
         else:
-            fp = os.open(filename, os.O_RDONLY, 0777)
+            fp = open_r(filename)
             contents = compile.read(fp)
             os.close(fp)
     else:
         if len(args) != 1:
-            os.write(2, 'aheui: error: --cmd,-c but input file found\n')
+            os.write(2, b'aheui: error: --cmd,-c but input file found\n')
             return 1
         contents = cmd
         filename = '-'
@@ -371,9 +385,9 @@ def entry_point(argv):
     if source == 'bytecode':
         compiler.read_bytecode(contents)
     elif source == 'asm':
-        compiler.read_asm(contents)
+        compiler.read_asm(contents.decode('utf-8'))
     else:
-        compiler.compile(contents)
+        compiler.compile(contents.decode('utf-8'))
 
     opt_level = int(kwargs['opt'])
     if opt_level == 0:
@@ -386,7 +400,9 @@ def entry_point(argv):
         assert False
 
     target = kwargs['target']
-    if target == 'run' and kwargs['no-c'] == 'no' and filename != '-' and not filename.endswith('.aheuic'):
+    need_aheuic = target == 'run' and kwargs['no-c'] == 'no'\
+        and filename != '-' and not filename.endswith('.aheuic')
+    if need_aheuic:
         targetname = filename
         if targetname.endswith('.aheui'):
             targetname += 'c'
@@ -395,7 +411,7 @@ def entry_point(argv):
         try:
             bfp = open_w(targetname)
             bytecode = compiler.write_bytecode()
-            asm = compiler.write_asm()
+            asm = compiler.write_asm().encode('utf-8')
             os.write(bfp, bytecode)
             os.write(bfp, '\n\n')
             os.write(bfp, asm)
@@ -427,7 +443,7 @@ def entry_point(argv):
         exitcode = mainloop(program, compiler.debug)
     elif target == 'asm':
         outfp = 1 if output == '-' else open_w(output)
-        asm = compiler.write_asm()
+        asm = compiler.write_asm().encode('utf-8')
         os.write(outfp, asm)
         os.close(outfp)
         exitcode = 0

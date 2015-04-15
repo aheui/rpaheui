@@ -20,7 +20,7 @@ except ImportError:
             self.list.sort()
 
 
-OP_NAMES = [None, None, 'DIV', 'ADD', 'MUL', 'MOD', 'POP', 'PUSH', 'DUP', 'SEL', 'MOV', None, 'CMP', None, 'BRZ', None, 'SUB', 'SWAP', 'HALT', 'POPNUM', 'POPCHAR', 'PUSHNUM', 'PUSHCHAR', 'BRPOP2', 'BRPOP1', 'JMP']
+OP_NAMES = [None, None, u'DIV', u'ADD', u'MUL', u'MOD', u'POP', u'PUSH', u'DUP', u'SEL', u'MOV', None, u'CMP', None, u'BRZ', None, u'SUB', u'SWAP', u'HALT', u'POPNUM', u'POPCHAR', u'PUSHNUM', u'PUSHCHAR', u'BRPOP2', u'BRPOP1', u'JMP']
 
 OP_HASOP = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 OP_USEVAL = [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
@@ -55,7 +55,7 @@ MV_VWALL = 20  # ㅣ
 
 MV_DETERMINISTICS = [MV_DOWN, MV_DOWN2, MV_UP, MV_UP2, MV_LEFT, MV_LEFT2, MV_RIGHT, MV_RIGHT2]
 
-DIR_NAMES = [None, 'DOWN', 'RIGHT', 'LJMP', 'UJMP', None, 'DJMP', 'RJMP', 'LBR', 'UBR', None, 'DBR', 'RBR', 'LEFT', 'UP']
+DIR_NAMES = [None, u'DOWN', u'RIGHT', u'LJMP', u'UJMP', None, u'DJMP', u'RJMP', u'LBR', u'UBR', None, u'DBR', u'RBR', u'LEFT', u'UP']
 
 DIR_DOWN = 1
 DIR_RIGHT = 2
@@ -64,7 +64,7 @@ DIR_LEFT = -2
 
 
 def padding(s, l, left=True):
-    spaces = ' ' * max(0, l - len(s))
+    spaces = u' ' * max(0, l - len(s))
     padded = (s + spaces) if left else (spaces + s)
     return padded
 
@@ -73,10 +73,10 @@ def read(fp=0):
     text_fragments = []
     while True:
         buf = os.read(fp, 1024)
-        if buf == '':
+        if len(buf) == 0:
             break
         text_fragments.append(buf)
-    text = ''.join(text_fragments)
+    text = b''.join(text_fragments)
     return text
 
 
@@ -94,11 +94,14 @@ class Debug(object):
         for (pos, dir, step), i in code_map.items():
             if dir >= 3:
                 continue
-            self.comments[i].append(primitive.pane[pos].encode('utf-8'))
-            self.comments[i].append('[%s,%s] %s%s' % (padding(str(pos[0]), 3, left=False), padding(str(pos[1]), 3, left=False), padding(DIR_NAMES[dir], 5), step))
+            self.comments[i].append(primitive.pane[pos])
+            srow = padding(u'%d' % pos[0], 3, left=False)
+            scol = padding(u'%d' % pos[1], 3, left=False)
+            sdir = padding(DIR_NAMES[dir], 5)
+            self.comments[i].append(u'[%s,%s] %s%s' % (srow, scol, sdir, step))
 
     def comment(self, i):
-        return ' / '.join(self.comments[i])
+        return u' / '.join(self.comments[i])
 
     def show(self, pc, fp=2):
         op, value = self.lines[pc]
@@ -122,7 +125,7 @@ class Debug(object):
 
 class PrimitiveProgram(object):
     def __init__(self, text):
-        self.text = text.decode('utf-8')
+        self.text = text
         self.pane = {}
 
         pc_row = 0
@@ -145,8 +148,8 @@ class PrimitiveProgram(object):
     def decode(self, position):
         code = self.pane[position]
         base = ord(code) - ord(u'가')
-        op_code = base / 588
-        mv_code = (base / 28) % 21
+        op_code = base // 588
+        mv_code = (base // 28) % 21
         val_code = base % 28
         return op_code, mv_code, val_code
 
@@ -396,7 +399,7 @@ class Compiler(object):
             if self.debug:
                 comments = []
                 for comment in comments_buffer:
-                    if 'JMP' in comment:
+                    if u'JMP' in comment:
                         pass
                     comments.append(comment)
                 new_comments[-1] += comments + self.debug.comments[i]
@@ -668,8 +671,8 @@ class Compiler(object):
 
         if self.debug:
             for pc, queueable in enumerate(queue_map):
-                if queueable and 'QUEUE' not in self.debug.comments[pc]:
-                    self.debug.comments[pc].append('QUEUE')
+                if queueable and u'QUEUE' not in self.debug.comments[pc]:
+                    self.debug.comments[pc].append(u'QUEUE')
 
         label_targets = self.label_map.values()
         label_rmap = {}
@@ -747,7 +750,7 @@ class Compiler(object):
             elif op == OP_MUL:
                 v = v2 * v1
             elif op == OP_DIV:
-                v = v2 / v1
+                v = v2 // v1
             elif op == OP_MOD:
                 v = v2 % v1
             elif op == OP_CMP:
@@ -828,26 +831,29 @@ class Compiler(object):
         codes = []
         for i, (op, val) in enumerate(self.lines):
             if i in self.label_map.values():
-                label_str = 'L%d:' % i
+                label_str = u'L%d:' % i
                 codes.append(padding(label_str, 8))
             else:
-                codes.append(' ' * 8)
+                codes.append(u' ' * 8)
             code = OP_NAMES[op]
+            if len(code.encode('utf-8')) == 3:
+                code += u' '
             if code is None:
-                code = 'inst' + str(op)
-            if len(code) == 3:
-                code += ' '
+                code = u'inst%d' % op
             if OP_USEVAL[op]:
                 if op in OP_JUMPS:
-                    code_val = '%s L%s' % (code, padding(str(self.label_map[val]), 3))
+                    slabel = padding(u'%d' % self.label_map[val], 3)
+                    code_val = u'%s L%s' % (code, slabel)
                 else:
-                    code_val = '%s %s' % (code, padding(str(val), 4))
+                    sval = padding(u'%d' % val, 4)
+                    code_val = u'%s %s' % (code, sval)
             else:
                 code_val = code
             code_val = padding(code_val, 10)
-            comment = self.debug.comment(i) if self.debug else ''
-            codes.append('%s ; L%s %s\n' % (code_val, padding(str(i), 3), comment))
-        return ''.join(codes)
+            comment = self.debug.comment(i) if self.debug else u''
+            sline = padding(u'%d' % i, 3)
+            codes.append(u'%s ; L%s %s\n' % (code_val, sline, comment))
+        return u''.join(codes)
 
     def read_asm(self, text):
         """Read assembly representation."""
@@ -855,7 +861,7 @@ class Compiler(object):
         for opcode, name in enumerate(OP_NAMES):
             if name is None:
                 continue
-            if name in ['BRPOP1', 'BRPOP2', 'JMP']:
+            if name in [u'BRPOP1', u'BRPOP2', u'JMP']:
                 opcode -= len(OP_NAMES)
             OPCODE_MAP[name] = opcode
         label_name_map = {}
@@ -863,20 +869,21 @@ class Compiler(object):
 
         lines = []
         comments = []
-        for row in text.split('\n'):
-            if ';' in row:
-                main, comment = row.split(';', 1)
+        for row in text.split(u'\n'):
+            if u';' in row:
+                main, comment = row.split(u';', 1)
             else:
-                main, comment = row, ''
-            if ':' in main:
-                label, main = main.split(':')
-                label = label.strip()
+                main, comment = row, u''
+            if u':' in main:
+                label, main = main.split(u':')
                 label_name_map[label] = len(lines)
+            label = label.strip(' \t')
             main = main.strip(' \t')
             if not main:
                 continue
-            parts = main.split(' ')
-            opcode = OPCODE_MAP[parts[0].upper()]
+            parts = main.split(u' ')
+            opname = parts[0].encode('utf-8').upper().decode('utf-8')
+            opcode = OPCODE_MAP[opname]
             val = parts[-1]
             try:
                 if opcode in OP_JUMPS:
@@ -892,8 +899,8 @@ class Compiler(object):
                 else:
                     lines.append((opcode, -1))
                 comments.append([comment])
-            except Exception, e:
-                os.write(2, "parsing error: ln%d %s\n" % (len(lines), main))
+            except Exception as e:
+                os.write(2, b'parsing error: ln%d %s\n' % (len(lines), main.encode('utf-8')))
                 raise
         self.lines = lines
         self.label_map = {}

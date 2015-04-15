@@ -111,7 +111,7 @@ class ArgumentParser(object):
         import os
         try:
             return self._parse_args(args)
-        except HelpException, e:
+        except HelpException as e:
             os.write(2, 'usage: %s [option] ... file\n\n' % self.kwargs.get('prog', args[0]))
             for names, opt in self.arguments:
                 name = names[0] if names[0] == names[1] else ('%s,%s' % names[0:2])
@@ -124,9 +124,9 @@ class ArgumentParser(object):
                     os.write(2, '\n')
                     os.write(2, opt['full_description'])
                 os.write(2, '\n')
-        except InformationException, e:
+        except InformationException as e:
             os.write(2, '%s\n' % e.desc)
-        except ParserError, e:
+        except ParserError as e:
             prog = self.kwargs.get('prog', args[0])
             os.write(2, '%s: error: %s\n' % (prog, e.message()))
         return {}, []
