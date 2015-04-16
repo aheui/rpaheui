@@ -4,7 +4,7 @@ from setuptools import setup
 
 
 def get_version():
-    import version
+    from aheui import version
     return version.VERSION
 
 def get_readme():
@@ -27,12 +27,12 @@ setup(
         'aheui',
     ),
     package_data={
-        'aheui': ['version.txt']
+        'aheui': ['version.py']
     },
     install_requires=[
     ],
     scripts=[
-        'aheui.py'
+        'aheui/aheui-py'
     ],
     classifiers=[
         'Intended Audience :: Developers',

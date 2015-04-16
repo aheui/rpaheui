@@ -2,4 +2,6 @@
 *.swp
 *.log
 *-c
+*.egg-info
+dist
 .env*

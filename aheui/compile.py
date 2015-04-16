@@ -877,7 +877,7 @@ class Compiler(object):
             if u':' in main:
                 label, main = main.split(u':')
                 label_name_map[label] = len(lines)
-            label = label.strip(' \t')
+                label = label.strip(' \t')
             main = main.strip(' \t')
             if not main:
                 continue
