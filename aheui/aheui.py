@@ -3,11 +3,16 @@
 
 import os
 
-from const import *
-import _argparse
-import compile
-from _rpython import *
-
+try:
+    from aheui.const import *
+    from aheui._rpython import *
+    from aheui import _argparse
+    from aheui import compile
+except ImportError:
+    from const import *
+    from _rpython import *
+    import _argparse
+    import compile
 
 def get_location(pc, stackok, is_queue, program):
     """Add debug information.

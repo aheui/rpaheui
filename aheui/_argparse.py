@@ -1,5 +1,9 @@
 
-from version import VERSION
+from __future__ import absolute_import
+try:
+    from aheui.version import VERSION
+except ImportError:
+    from version import VERSION
 
 
 class ParserError(Exception):
