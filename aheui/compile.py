@@ -8,7 +8,10 @@ except ImportError:
     DEBUG = False
 
 import os
-from const import *
+try:
+    from aheui.const import *
+except ImportError:
+    from const import *
 try:
     from rpython.rlib.listsort import TimSort
 except ImportError:
