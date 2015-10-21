@@ -14,6 +14,7 @@ except ImportError:
     import _argparse
     import compile
 
+
 def get_location(pc, stackok, is_queue, program):
     """Add debug information.
 
@@ -47,7 +48,7 @@ class Stack(object):
         self.size = 0
 
     def push(self, value):
-        #assert(isinstance(value, int))
+        # assert(isinstance(value, int))
         node = Link(self.head, value)
         self.head = node
         self.size += 1
@@ -468,7 +469,8 @@ def jitpolicy(driver):
     return JitPolicy()
 
 
-def target(*args): return entry_point, None
+def target(*args):
+    return entry_point, None
 
 
 if __name__ == '__main__':

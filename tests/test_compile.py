@@ -1,6 +1,7 @@
 
-#coding: utf-8
+# -*- coding: utf-8 -*-
 from aheui import compile
+
 
 def test_compiler():
     compiler = compile.Compiler()

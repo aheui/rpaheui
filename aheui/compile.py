@@ -475,7 +475,7 @@ class Compiler(object):
                         break
                 pc += 1
 
-        reachability = [int(minstacksize >= 0) for minstacksize in minstacksize_map]
+        reachability = [int(size >= 0) for size in minstacksize_map]
         return reachability
 
     def optimize_deadcode2(self):
@@ -526,13 +526,12 @@ class Compiler(object):
                         break
                 pc += 1
 
-        reachability = [int(minstacksizes[0] >= 0) for minstacksizes in minstacksize_map]
+        reachability = [int(sizes[0] >= 0) for sizes in minstacksize_map]
         return reachability
 
     def optimize_order(self):
         lines = self.lines
         hints = [x for x in range(0, len(lines))]
-        c = 0
         while True:
             jump_map = {}
             jump_rmap = {}
@@ -830,7 +829,6 @@ class Compiler(object):
 
     def write_asm(self, fp=1):
         """Write assembly representation with comments."""
-        label_revmap = {}
         codes = []
         for i, (op, val) in enumerate(self.lines):
             if i in self.label_map.values():
@@ -902,7 +900,7 @@ class Compiler(object):
                 else:
                     lines.append((opcode, -1))
                 comments.append([comment])
-            except Exception as e:
+            except Exception:
                 os.write(2, b'parsing error: ln%d %s\n' % (len(lines), main.encode('utf-8')))
                 raise
         self.lines = lines

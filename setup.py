@@ -7,6 +7,7 @@ def get_version():
     from aheui import version
     return version.VERSION
 
+
 def get_readme():
     try:
         with open('README.md') as f:
@@ -31,6 +32,9 @@ setup(
     },
     install_requires=[
     ],
+    tests_require=[
+        'flake8', 'tox', 'pytest',
+    ],
     scripts=[
         'aheui/aheui-py'
     ],
@@ -42,5 +46,6 @@ setup(
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
-     ],
+        'Programming Language :: Python :: 3.5',
+    ],
 )
