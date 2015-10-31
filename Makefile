@@ -4,7 +4,6 @@ RPYTHONFLAGS?=--opt=jit
 
 
 all: aheui-c
-	;
 
 version:
 	echo "VERSION = '`git describe --tags`'" > aheui/version.py
