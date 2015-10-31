@@ -4,10 +4,10 @@ RPYTHONFLAGS=--opt=jit
 #RPYTHONFLAGS=
 
 all: aheui-c
-	
+	;
 
 version:
-	echo "VERSION='`git describe --tags`'" > aheui/version.py
+	echo "VERSION = '`git describe --tags`'" > aheui/version.py
 
 aheui-c: version
 	cd aheui && ../$(RPYTHON) $(RPYTHONFLAGS) aheui.py

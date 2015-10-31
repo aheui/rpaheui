@@ -5,12 +5,13 @@ import os
 
 try:
     from aheui.const import *
-    from aheui._rpython import *
+    from aheui._compat import *
     from aheui import _argparse
     from aheui import compile
 except ImportError:
     from const import *
-    from _rpython import *
+    from _compat import *
+    from _compat import _unicode
     import _argparse
     import compile
 
@@ -24,9 +25,10 @@ def get_location(pc, stackok, is_queue, program):
     val = program.get_operand(pc)
     return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OP_NAMES[op].encode('utf-8'), val)
 
-driver = JitDriver(greens=['pc', 'stackok', 'is_queue', 'program'],
-                   reds=['stacksize', 'storage', 'selected'],
-                   get_printable_location=get_location)
+driver = JitDriver(
+    greens=['pc', 'stackok', 'is_queue', 'program'],
+    reds=['stacksize', 'storage', 'selected'],
+    get_printable_location=get_location)
 
 
 DEBUG = False
@@ -309,7 +311,7 @@ def mainloop(program, debug):
                 continue
         elif op == OP_POPNUM:
             r = selected.pop()
-            os.write(1, (u'%d' % r).encode('utf-8'))
+            os.write(1, _unicode(r).encode('utf-8'))
         elif op == OP_POPCHAR:
             r = selected.pop()
             os.write(1, unichr(r).encode('utf-8'))

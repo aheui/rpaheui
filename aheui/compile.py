@@ -10,17 +10,10 @@ except ImportError:
 import os
 try:
     from aheui.const import *
+    from aheui._compat import _unicode
 except ImportError:
     from const import *
-try:
-    from rpython.rlib.listsort import TimSort
-except ImportError:
-    class TimSort(object):
-        def __init__(self, list):
-            self.list = list
-
-        def sort(self):
-            self.list.sort()
+    from _compat import _unicode
 
 
 OP_NAMES = [None, None, u'DIV', u'ADD', u'MUL', u'MOD', u'POP', u'PUSH', u'DUP', u'SEL', u'MOV', None, u'CMP', None, u'BRZ', None, u'SUB', u'SWAP', u'HALT', u'POPNUM', u'POPCHAR', u'PUSHNUM', u'PUSHCHAR', u'BRPOP2', u'BRPOP1', u'JMP']
@@ -98,17 +91,17 @@ class Debug(object):
             if dir >= 3:
                 continue
             self.comments[i].append(primitive.pane[pos])
-            srow = padding(u'%d' % pos[0], 3, left=False)
-            scol = padding(u'%d' % pos[1], 3, left=False)
+            srow = padding(_unicode(pos[0]), 3, left=False)
+            scol = padding(_unicode(pos[1]), 3, left=False)
             sdir = padding(DIR_NAMES[dir], 5)
-            self.comments[i].append(u'[%s,%s] %s%s' % (srow, scol, sdir, step))
+            self.comments[i].append(u'[%s,%s] %s%s' % (srow, scol, sdir, _unicode(step)))
 
     def comment(self, i):
         return u' / '.join(self.comments[i])
 
     def show(self, pc, fp=2):
         op, value = self.lines[pc]
-        os.write(fp, (u'L%d %s(%s) %s ;' % (pc, OP_NAMES[op], unichr(0x1100 + op), value if OP_USEVAL[op] else '')).encode('utf-8'))
+        os.write(fp, (u'L%s %s(%s) %s ;' % (_unicode(pc), OP_NAMES[op], unichr(0x1100 + op), value if OP_USEVAL[op] else '')).encode('utf-8'))
         os.write(fp, self.comment(pc))
         os.write(fp, '\n')
 
@@ -122,8 +115,8 @@ class Debug(object):
             return '[' + ', '.join(items) + ']'
         for i, l in enumerate(storage):
             marker = u':' if l == selected else u' '
-            os.write(2, (u'%s (%d):%s' % (unichr(0x11a8 + i - 1), i, marker)).encode('utf-8'))
-            os.write(2, ('%s\n' % _list(l)))
+            os.write(2, (u'%s (%s):%s' % (unichr(0x11a8 + i - 1), _unicode(i), marker)).encode('utf-8'))
+            os.write(2, (u'%s\n' % _list(l)).encode('utf-8'))
 
 
 class PrimitiveProgram(object):
@@ -832,7 +825,7 @@ class Compiler(object):
         codes = []
         for i, (op, val) in enumerate(self.lines):
             if i in self.label_map.values():
-                label_str = u'L%d:' % i
+                label_str = u'L%s:' % _unicode(i)
                 codes.append(padding(label_str, 8))
             else:
                 codes.append(u' ' * 8)
@@ -840,19 +833,19 @@ class Compiler(object):
             if len(code.encode('utf-8')) == 3:
                 code += u' '
             if code is None:
-                code = u'inst%d' % op
+                code = u'inst%s' % _unicode(op)
             if OP_USEVAL[op]:
                 if op in OP_JUMPS:
-                    slabel = padding(u'%d' % self.label_map[val], 3)
+                    slabel = padding(_unicode(self.label_map[val]), 3)
                     code_val = u'%s L%s' % (code, slabel)
                 else:
-                    sval = padding(u'%d' % val, 4)
+                    sval = padding(_unicode(val), 4)
                     code_val = u'%s %s' % (code, sval)
             else:
                 code_val = code
             code_val = padding(code_val, 10)
             comment = self.debug.comment(i) if self.debug else u''
-            sline = padding(u'%d' % i, 3)
+            sline = padding(_unicode(i), 3)
             codes.append(u'%s ; L%s %s\n' % (code_val, sline, comment))
         return u''.join(codes)
 
