@@ -1,7 +1,7 @@
 
-RPYTHON=../pypy/rpython/bin/rpython
-RPYTHONFLAGS=--opt=jit
-#RPYTHONFLAGS=
+RPYTHON?=../pypy/rpython/bin/rpython
+RPYTHONFLAGS?=--opt=jit
+
 
 all: aheui-c
 	;
