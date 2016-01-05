@@ -4,6 +4,8 @@
 * English: [README.en.md](https://github.com/aheui/rpaheui/blob/master/README.en.md)
 * Working log (English): [LOG.md](https://github.com/aheui/rpaheui/blob/master/LOG.md)
 
+* 빌드 및 실행 영상: [Youtube](https://www.youtube.com/watch?v=mjoj69i_f8s)
+* 2015 한국 파이콘: [PyPy/RPython으로 20배 빨라지는 JIT 아희 인터프리터](http://www.slideshare.net/YunWonJeong/pypyrpython-20-jit)
 
 알파희썬은 PyPy를 개발하기 위해 개발/사용된 python의 방언으로서 정적 언어로 컴파일되고 tracing-JIT를 지원하기 위한 라이브러리를 내장하고 있습니다.
 알파희썬으로 개발한 언어는 손쉽게 파이썬으로 실행하거나 바이너리로 빌드할 수 있고, JIT를 적용하기도 쉽습니다.
