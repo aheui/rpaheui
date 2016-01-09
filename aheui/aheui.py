@@ -279,6 +279,10 @@ class Program(object):
         return self.labels[self.get_operand(pc)]
 
 
+outfp = 1
+errfp = 2
+
+
 def mainloop(program, debug):
     set_param(driver, 'trace_limit', 30000)
     assert_green(program)
@@ -350,10 +354,10 @@ def mainloop(program, debug):
                 continue
         elif op == OP_POPNUM:
             r = selected.pop_longlong()
-            os.write(1, _unicode(r).encode('utf-8'))
+            os.write(outfp, _unicode(r).encode('utf-8'))
         elif op == OP_POPCHAR:
             r = selected.pop_longlong()
-            os.write(1, unichr(r).encode('utf-8'))
+            os.write(outfp, unichr(r).encode('utf-8'))
         elif op == OP_JMP:
             value = program.get_label(pc)
             pc = value
@@ -373,7 +377,7 @@ def mainloop(program, debug):
         elif op == OP_HALT:
             break
         else:
-            os.write(2, 'Missing operator: %d' % op)
+            os.write(errfp, 'Missing operator: %d' % op)
             assert False
         pc += 1
 
@@ -383,23 +387,20 @@ def mainloop(program, debug):
         return 0
 
 
-def entry_point(argv):
-    def open_w(filename):
-        return os.open(filename, os.O_WRONLY | os.O_CREAT, 0o644)
-
+def process_opt(argv):
     def open_r(filename):
         return os.open(filename, os.O_RDONLY, 0o777)
 
     parser = _argparse.parser
     kwargs, args = parser.parse_args(argv)
     if not args:
-        return 1
+        raise SystemExit()
 
     cmd = kwargs['cmd']
     if cmd == '':
         if len(args) != 2:
             os.write(2, b'aheui: error: no input files\n')
-            return 1
+            raise SystemExit()
         filename = args[1]
         if filename == '-':
             fp = 0
@@ -411,7 +412,7 @@ def entry_point(argv):
     else:
         if len(args) != 1:
             os.write(2, b'aheui: error: --cmd,-c but input file found\n')
-            return 1
+            raise SystemExit()
         contents = cmd
         filename = '-'
 
@@ -428,43 +429,20 @@ def entry_point(argv):
         else:
             source = 'text'
 
-    compiler = compile.Compiler()
-    if source == 'bytecode':
-        compiler.read_bytecode(contents)
-    elif source == 'asm':
-        compiler.read_asm(contents.decode('utf-8'))
-    else:
-        compiler.compile(contents.decode('utf-8'))
-
-    opt_level = int(kwargs['opt'])
-    if opt_level == 0:
-        pass
-    elif opt_level == 1:
-        compiler.optimize1()
-    elif opt_level == 2:
-        compiler.optimize2()
-    else:
-        assert False
+    opt_level = kwargs['opt']
 
     target = kwargs['target']
     need_aheuic = target == 'run' and kwargs['no-c'] == 'no'\
         and filename != '-' and not filename.endswith('.aheuic')
+
     if need_aheuic:
-        targetname = filename
-        if targetname.endswith('.aheui'):
-            targetname += 'c'
+        aheuic_output = filename
+        if aheuic_output.endswith('.aheui'):
+            aheuic_output += 'c'
         else:
-            targetname += '.aheuic'
-        try:
-            bfp = open_w(targetname)
-            bytecode = compiler.write_bytecode()
-            asm = compiler.write_asm().encode('utf-8')
-            os.write(bfp, bytecode)
-            os.write(bfp, '\n\n')
-            os.write(bfp, asm)
-            os.close(bfp)
-        except:
-            pass
+            aheuic_output += '.aheuic'
+    else:
+        aheuic_output = None
 
     output = kwargs['output']
     if output == '':
@@ -483,19 +461,65 @@ def entry_point(argv):
         elif target == 'run':
             output = '-'
         else:
-            assert False
+            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "run"\n')
+            raise SystemExit()
 
+    return cmd, source, contents, opt_level, target, aheuic_output, output
+
+
+def open_w(filename):
+    return os.open(filename, os.O_WRONLY | os.O_CREAT, 0o644)
+
+
+def prepare_compiler(contents, opt_level=1, source='code', aheuic_output=None):
+    compiler = compile.Compiler()
+    if source == 'bytecode':
+        compiler.read_bytecode(contents)
+    elif source == 'asm':
+        compiler.read_asm(contents.decode('utf-8'))
+    else:
+        compiler.compile(contents.decode('utf-8'))
+
+    if opt_level == 0:
+        pass
+    elif opt_level == 1:
+        compiler.optimize1()
+    elif opt_level == 2:
+        compiler.optimize2()
+    else:
+        assert False
+
+    if aheuic_output is not None:
+        try:
+            bfp = open_w(aheuic_output)
+            bytecode = compiler.write_bytecode()
+            asm = compiler.write_asm().encode('utf-8')
+            os.write(bfp, bytecode)
+            os.write(bfp, '\n\n')
+            os.write(bfp, asm)
+            os.close(bfp)
+        except:
+            pass
+    return compiler
+
+
+def entry_point(argv):
+    try:
+        cmd, source, contents, str_opt_level, target, aheuic_output, output = process_opt(argv)
+    except SystemExit:
+        return 1
+
+    compiler = prepare_compiler(contents, int(str_opt_level), source, aheuic_output)
+    outfp = 1 if output == '-' else open_w(output)
     if target == 'run':
         program = Program(compiler.lines, compiler.label_map)
         exitcode = mainloop(program, compiler.debug)
     elif target == 'asm':
-        outfp = 1 if output == '-' else open_w(output)
         asm = compiler.write_asm().encode('utf-8')
         os.write(outfp, asm)
         os.close(outfp)
         exitcode = 0
     elif target == 'bytecode':
-        outfp = 1 if output == '-' else open_w(output)
         bytecode = compiler.write_bytecode()
         os.write(outfp, bytecode)
         os.close(outfp)
