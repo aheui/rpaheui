@@ -165,6 +165,25 @@ class Storage(object):
         return self.pools[idx]
 
 
+class InputBuffer(object):
+
+    def __init__(self):
+        self.buf = b''
+
+    def load(self, length):
+        read_length = length - len(self.buf)
+        self.buf += os.read(0, read_length)
+
+    def take(self, length):
+        result, self.buf = self.buf[:length], self.buf[length:]
+        return result
+
+    def look(self, length):
+        return self.buf[:length]
+
+input_buffer = InputBuffer()
+
+
 @dont_look_inside
 def get_utf8():
     """Get a utf-8 character from standard input.
@@ -174,9 +193,10 @@ def get_utf8():
     Non-utf-8 character input is undefined in aheui.
     Let's put -1 in this implementaion.
     """
-    buf = os.read(0, 1)
-    if buf:
-        v = ord(buf[0])
+    input_buffer.load(1)
+    head = input_buffer.look(1)
+    if head:
+        v = ord(head[0])
         if v >= 0x80:
             if (v & 0xf0) == 0xf0:
                 length = 4
@@ -187,7 +207,8 @@ def get_utf8():
             else:
                 length = 0
             if length > 0:
-                buf += os.read(0, length - 1)
+                input_buffer.load(length)
+                buf = input_buffer.take(length)
                 if len(buf) == length:
                     try:
                         v = ord((buf).decode('utf-8')[0])
@@ -204,14 +225,22 @@ def get_utf8():
 def get_number():
     """Get a number from standard input."""
     numchars = []
+    input_buffer.load(1)
+    numchar = input_buffer.look(1)
+    negative = numchar == b'-'
+    if negative:
+        input_buffer.take(1)
     while True:
-        numchar = os.read(0, 1)
+        input_buffer.load(1)
+        numchar = input_buffer.take(1)
         if numchar not in [b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'0']:
             break
         else:
             numchars.append(numchar)
     assert len(numchars) > 0
     num = int(b''.join(numchars))
+    if negative:
+        num = -num
     return num
 
 
