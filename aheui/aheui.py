@@ -8,12 +8,14 @@ try:
     from aheui._compat import *
     from aheui import _argparse
     from aheui import compile
+    from aheui.int import smallint as bigint
 except ImportError:
     from const import *
     from _compat import *
     from _compat import _unicode
     import _argparse
     import compile
+    from int import smallint as bigint  # import `bigint` to enable bigint
 
 
 def get_location(pc, stackok, is_queue, program):
@@ -37,7 +39,7 @@ DEBUG = False
 class Link(object):
     """Element unit for stack and queue."""
 
-    def __init__(self, next, value=-1):
+    def __init__(self, next, value=bigint.fromlong(-1)):
         self.value = value
         self.next = next
 
@@ -63,6 +65,11 @@ class Stack(object):
         self.size -= 1
         return value
 
+    def pop_longlong(self):
+        big_r = self.pop()
+        r = bigint.tolonglong(big_r)
+        return r
+
     def dup(self):
         self.push(self.head.value)
 
@@ -86,33 +93,34 @@ class Stack(object):
 
     def add(self):
         r1, r2 = self.get_2_values()
-        r = r2 + r1
+        r = bigint.add(r2, r1)
         self.put_value(r)
 
     def sub(self):
         r1, r2 = self.get_2_values()
-        r = r2 - r1
+        r = bigint.sub(r2, r1)
         self.put_value(r)
 
     def mul(self):
         r1, r2 = self.get_2_values()
-        r = r2 * r1
+        r = bigint.mul(r2, r1)
         self.put_value(r)
 
     def div(self):
         r1, r2 = self.get_2_values()
-        r = r2 // r1
+        r = bigint.div(r2, r1)
         self.put_value(r)
 
     def mod(self):
         r1, r2 = self.get_2_values()
-        r = r2 % r1
+        r = bigint.mod(r2, r1)
         self.put_value(r)
 
     def cmp(self):
         r1, r2 = self.get_2_values()
-        r = int(r2 >= r1)
-        self.put_value(r)
+        r = int(bigint.ge(r2, r1))
+        big_r = bigint.fromint(r)
+        self.put_value(big_r)
 
 
 class Queue(Stack):
@@ -218,7 +226,8 @@ def get_utf8():
                     v = -1
     else:
         v = -1
-    return v
+    big_v = bigint.fromint(v)
+    return big_v
 
 
 @dont_look_inside
@@ -238,9 +247,9 @@ def get_number():
         else:
             numchars.append(numchar)
     assert len(numchars) > 0
-    num = int(b''.join(numchars))
     if negative:
-        num = -num
+        numchars.insert(0, b'-')
+    num = bigint.fromstr(b''.join(numchars))
     return num
 
 
@@ -303,7 +312,8 @@ def mainloop(program, debug):
             selected.pop()
         elif op == OP_PUSH:
             value = program.get_operand(pc)
-            selected.push(value)
+            big_value = bigint.fromint(value)
+            selected.push(big_value)
         elif op == OP_DUP:
             selected.dup()
         elif op == OP_SWAP:
@@ -320,7 +330,7 @@ def mainloop(program, debug):
         elif op == OP_CMP:
             selected.cmp()
         elif op == OP_BRZ:
-            r = selected.pop()
+            r = selected.pop_longlong()
             if r == 0:
                 value = program.get_label(pc)
                 pc = value
@@ -339,17 +349,11 @@ def mainloop(program, debug):
                     stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == OP_POPNUM:
-            r = selected.pop()
+            r = selected.pop_longlong()
             os.write(1, _unicode(r).encode('utf-8'))
         elif op == OP_POPCHAR:
-            r = selected.pop()
+            r = selected.pop_longlong()
             os.write(1, unichr(r).encode('utf-8'))
-        elif op == OP_PUSHNUM:
-            num = get_number()
-            selected.push(num)
-        elif op == OP_PUSHCHAR:
-            c = get_utf8()
-            selected.push(c)
         elif op == OP_JMP:
             value = program.get_label(pc)
             pc = value
@@ -358,17 +362,23 @@ def mainloop(program, debug):
                 pc=pc, stackok=stackok, is_queue=is_queue, program=program,
                 stacksize=stacksize, storage=storage, selected=selected)
             continue
-        elif op == OP_HALT:
-            break
+        elif op == OP_PUSHNUM:
+            num = get_number()
+            selected.push(num)
+        elif op == OP_PUSHCHAR:
+            c = get_utf8()
+            selected.push(c)
         elif op == OP_NONE:
             pass
+        elif op == OP_HALT:
+            break
         else:
             os.write(2, 'Missing operator: %d' % op)
             assert False
         pc += 1
 
     if len(selected) > 0:
-        return selected.pop()
+        return int(selected.pop_longlong())
     else:
         return 0
 

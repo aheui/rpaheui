@@ -44,6 +44,11 @@ except NameError:
             return n
         return ord3(n)
 
+try:
+    long(0)
+except NameError:
+    long = int
+
 
 try:
     # rpython, python2
