@@ -5,9 +5,8 @@ from __future__ import absolute_import
 
 import os
 
-from aheui.const import *
-from aheui._compat import *
-from aheui._compat import _unicode
+from aheui import const as c
+from aheui._compat import jit, unichr, ord, _unicode
 from aheui import _argparse
 from aheui import compile
 from aheui.int import smallint as bigint  # import `bigint` to enable bigint
@@ -22,7 +21,7 @@ def get_location(pc, stackok, is_queue, program):
     val = program.get_operand(pc)
     return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OP_NAMES[op].encode('utf-8'), val)
 
-driver = JitDriver(
+driver = jit.JitDriver(
     greens=['pc', 'stackok', 'is_queue', 'program'],
     reds=['stacksize', 'storage', 'selected'],
     get_printable_location=get_location)
@@ -155,10 +154,10 @@ class Storage(object):
 
     def __init__(self):
         pools = []
-        for i in range(0, STORAGE_COUNT):
-            if i == VAL_QUEUE:
+        for i in range(0, c.STORAGE_COUNT):
+            if i == c.VAL_QUEUE:
                 pools.append(Queue())
-            elif i == VAL_PORT:
+            elif i == c.VAL_PORT:
                 pools.append(Port())
             else:
                 pools.append(Stack())
@@ -170,12 +169,14 @@ class Storage(object):
 
 class InputBuffer(object):
 
-    def __init__(self):
+    def __init__(self, read=os.read):
         self.buf = b''
+        self.read = read
 
     def load(self, length):
         read_length = length - len(self.buf)
-        self.buf += os.read(0, read_length)
+        if read_length > 0:
+            self.buf += self.read(0, read_length)
 
     def take(self, length):
         result, self.buf = self.buf[:length], self.buf[length:]
@@ -187,8 +188,8 @@ class InputBuffer(object):
 input_buffer = InputBuffer()
 
 
-@dont_look_inside
-def get_utf8():
+@jit.dont_look_inside
+def get_utf8(input_buffer=input_buffer):
     """Get a utf-8 character from standard input.
 
     The length of utf-8 character is detectable in first byte.
@@ -209,31 +210,33 @@ def get_utf8():
                 length = 2
             else:
                 length = 0
-            if length > 0:
-                input_buffer.load(length)
-                buf = input_buffer.take(length)
-                if len(buf) == length:
-                    try:
-                        v = ord((buf).decode('utf-8')[0])
-                    except:
-                        v = -1
-                else:
+        else:
+            length = 1
+        if length > 0:
+            input_buffer.load(length)
+            buf = input_buffer.take(length)
+            if len(buf) == length:
+                try:
+                    v = ord((buf).decode('utf-8')[0])
+                except:
                     v = -1
+            else:
+                v = -1
     else:
         v = -1
     big_v = bigint.fromint(v)
     return big_v
 
 
-@dont_look_inside
-def get_number():
+@jit.dont_look_inside
+def get_number(input_buffer=input_buffer):
     """Get a number from standard input."""
-    numchars = []
     input_buffer.load(1)
     numchar = input_buffer.look(1)
     negative = numchar == b'-'
     if negative:
         input_buffer.take(1)
+    numchars = []
     while True:
         input_buffer.load(1)
         numchar = input_buffer.take(1)
@@ -257,19 +260,19 @@ class Program(object):
         self.size = len(lines)
         self.labels = label_map
 
-    @elidable
+    @jit.elidable
     def get_op(self, pc):
         return self.opcodes[pc]
 
-    @elidable
+    @jit.elidable
     def get_operand(self, pc):
         return self.values[pc]
 
-    @elidable
+    @jit.elidable
     def get_req_size(self, pc):
-        return OP_REQSIZE[self.get_op(pc)]
+        return c.OP_REQSIZE[self.get_op(pc)]
 
-    @elidable
+    @jit.elidable
     def get_label(self, pc):
         return self.labels[self.get_operand(pc)]
 
@@ -279,13 +282,16 @@ errfp = 2
 
 
 def mainloop(program, debug):
-    set_param(driver, 'trace_limit', 30000)
-    assert_green(program)
+    jit.set_param(driver, 'trace_limit', 30000)
+    program = jit.promote(program)
+    jit.assert_green(program)
     pc = 0
     stacksize = 0
     is_queue = False
     storage = Storage()
+    storage = jit.promote(storage)
     selected = storage[0]
+    jit.assert_green(selected)
     while pc < program.size:
         #  debug.storage(storage, selected)
         #  raw_input()
@@ -295,40 +301,40 @@ def mainloop(program, debug):
             pc=pc, stackok=stackok, is_queue=is_queue, program=program,
             stacksize=stacksize, storage=storage, selected=selected)
         op = program.get_op(pc)
-        assert_green(op)
-        stacksize += - OP_STACKDEL[op] + OP_STACKADD[op]
-        if op == OP_ADD:
+        jit.assert_green(op)
+        stacksize += - c.OP_STACKDEL[op] + c.OP_STACKADD[op]
+        if op == c.OP_ADD:
             selected.add()
-        elif op == OP_SUB:
+        elif op == c.OP_SUB:
             selected.sub()
-        elif op == OP_MUL:
+        elif op == c.OP_MUL:
             selected.mul()
-        elif op == OP_DIV:
+        elif op == c.OP_DIV:
             selected.div()
-        elif op == OP_MOD:
+        elif op == c.OP_MOD:
             selected.mod()
-        elif op == OP_POP:
+        elif op == c.OP_POP:
             selected.pop()
-        elif op == OP_PUSH:
+        elif op == c.OP_PUSH:
             value = program.get_operand(pc)
             big_value = bigint.fromint(value)
             selected.push(big_value)
-        elif op == OP_DUP:
+        elif op == c.OP_DUP:
             selected.dup()
-        elif op == OP_SWAP:
+        elif op == c.OP_SWAP:
             selected.swap()
-        elif op == OP_SEL:
+        elif op == c.OP_SEL:
             value = program.get_operand(pc)
             selected = storage[value]
             stacksize = len(selected)
-            is_queue = value == VAL_QUEUE
-        elif op == OP_MOV:
+            is_queue = value == c.VAL_QUEUE
+        elif op == c.OP_MOV:
             r = selected.pop()
             value = program.get_operand(pc)
             storage[value].push(r)
-        elif op == OP_CMP:
+        elif op == c.OP_CMP:
             selected.cmp()
-        elif op == OP_BRZ:
+        elif op == c.OP_BRZ:
             r = selected.pop_longlong()
             if r == 0:
                 value = program.get_label(pc)
@@ -338,7 +344,7 @@ def mainloop(program, debug):
                     pc=pc, stackok=stackok, is_queue=is_queue, program=program,
                     stacksize=stacksize, storage=storage, selected=selected)
                 continue
-        elif op == OP_BRPOP1 or op == OP_BRPOP2:
+        elif op == c.OP_BRPOP1 or op == c.OP_BRPOP2:
             if not stackok:
                 value = program.get_label(pc)
                 pc = value
@@ -347,13 +353,13 @@ def mainloop(program, debug):
                     pc=pc, stackok=stackok, is_queue=is_queue, program=program,
                     stacksize=stacksize, storage=storage, selected=selected)
                 continue
-        elif op == OP_POPNUM:
+        elif op == c.OP_POPNUM:
             r = selected.pop_longlong()
             os.write(outfp, _unicode(r).encode('utf-8'))
-        elif op == OP_POPCHAR:
+        elif op == c.OP_POPCHAR:
             r = selected.pop_longlong()
             os.write(outfp, unichr(r).encode('utf-8'))
-        elif op == OP_JMP:
+        elif op == c.OP_JMP:
             value = program.get_label(pc)
             pc = value
             stackok = program.get_req_size(pc) <= stacksize
@@ -361,15 +367,15 @@ def mainloop(program, debug):
                 pc=pc, stackok=stackok, is_queue=is_queue, program=program,
                 stacksize=stacksize, storage=storage, selected=selected)
             continue
-        elif op == OP_PUSHNUM:
+        elif op == c.OP_PUSHNUM:
             num = get_number()
             selected.push(num)
-        elif op == OP_PUSHCHAR:
-            c = get_utf8()
-            selected.push(c)
-        elif op == OP_NONE:
+        elif op == c.OP_PUSHCHAR:
+            char = get_utf8()
+            selected.push(char)
+        elif op == c.OP_NONE:
             pass
-        elif op == OP_HALT:
+        elif op == c.OP_HALT:
             break
         else:
             os.write(errfp, 'Missing operator: %d' % op)

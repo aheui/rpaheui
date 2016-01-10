@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from __future__ import absolute_import
+
 try:
     import settings
     DEBUG = settings.DEBUG
@@ -8,12 +10,8 @@ except ImportError:
     DEBUG = False
 
 import os
-try:
-    from aheui.const import *
-    from aheui._compat import _unicode
-except ImportError:
-    from const import *
-    from _compat import _unicode
+from aheui.const import *
+from aheui._compat import unichr, _unicode
 
 
 OP_NAMES = [None, None, u'DIV', u'ADD', u'MUL', u'MOD', u'POP', u'PUSH', u'DUP', u'SEL', u'MOV', None, u'CMP', None, u'BRZ', None, u'SUB', u'SWAP', u'HALT', u'POPNUM', u'POPCHAR', u'PUSHNUM', u'PUSHCHAR', u'BRPOP2', u'BRPOP1', u'JMP']
