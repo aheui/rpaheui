@@ -26,6 +26,7 @@ setup(
     url='https://github.com/aheui/rpaheui',
     packages=(
         'aheui',
+        'aheui/int',
     ),
     package_data={
         'aheui': ['version.py']
@@ -36,7 +37,8 @@ setup(
         'flake8', 'tox', 'pytest',
     ],
     scripts=[
-        'aheui/aheui-py'
+        'bin/aheui-py',
+        'bin/aheui',
     ],
     classifiers=[
         'Intended Audience :: Developers',

@@ -1,21 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+from __future__ import absolute_import
+
 import os
 
-try:
-    from aheui.const import *
-    from aheui._compat import *
-    from aheui import _argparse
-    from aheui import compile
-    from aheui.int import smallint as bigint
-except ImportError:
-    from const import *
-    from _compat import *
-    from _compat import _unicode
-    import _argparse
-    import compile
-    from int import smallint as bigint  # import `bigint` to enable bigint
+from aheui.const import *
+from aheui._compat import *
+from aheui._compat import _unicode
+from aheui import _argparse
+from aheui import compile
+from aheui.int import smallint as bigint  # import `bigint` to enable bigint
 
 
 def get_location(pc, stackok, is_queue, program):
@@ -527,18 +522,3 @@ def entry_point(argv):
     else:
         assert False
     return exitcode
-
-
-def jitpolicy(driver):
-    from rpython.jit.codewriter.policy import JitPolicy
-    return JitPolicy()
-
-
-def target(*args):
-    return entry_point, None
-
-
-if __name__ == '__main__':
-    """Python compatibility."""
-    import sys
-    sys.exit(entry_point(sys.argv))

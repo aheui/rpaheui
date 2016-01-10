@@ -3,25 +3,30 @@ RPYTHON?=../pypy/rpython/bin/rpython
 RPYTHONFLAGS?=--opt=jit
 
 
-all: aheui-c
+all: aheui-c aheui-py
 
 version:
 	echo "VERSION = '`git describe --tags`'" > aheui/version.py
 
+aheui-py:
+	cp rpaheui.py bin/aheui-py
+	cp rpaheui.py bin/aheui
+
 aheui-c: version
-	cd aheui && ../$(RPYTHON) $(RPYTHONFLAGS) aheui.py
+	$(RPYTHON) $(RPYTHONFLAGS) rpaheui.py
 
 clean:
-	rm aheui-c
+	rm rpaheui-c
 
 install: aheui-c
-	cp aheui/aheui-c /usr/local/bin/aheui
+	cp rpaheui-c /usr/local/bin/rpaheui
+	ln -s /usr/local/bin/rpaheui /usr/local/bin/aheui
 
 test:
 	if [ -e snippets ]; then cd snippets && git pull; else git clone https://github.com/aheui/snippets; fi
-	cd snippets && AHEUI="../aheui/aheui-c" bash test.sh
+	cd snippets && AHEUI="../rpaheui-c" bash test.sh
 
 testpy:
 	py.test
 	if [ -e snippets ]; then cd snippets && git pull; else git clone https://github.com/aheui/snippets; fi
-	cd snippets && AHEUI=../aheui/aheui.py bash test.sh
+	cd snippets && AHEUI=../rpaheui.py bash test.sh

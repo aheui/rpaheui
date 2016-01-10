@@ -11,5 +11,5 @@ install:
 # command to run tests
 script:
   - "py.test tests/"
-  - "cd snippets && AHEUI=../aheui/aheui.py ./test.sh standard"
+  - "cd snippets && AHEUI=../rpaheui.py ./test.sh standard"
 sudo: false
