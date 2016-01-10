@@ -155,7 +155,7 @@ Without `can_enter_jit`, the JIT driver regards `jit_merge_point` is enterable p
 def mainloop(program, debug):
     pc = 0
     storage = init_storage()
-    while pc < program.size: 
+    while pc < program.size:
         driver.jit_merge_point(pc=pc, proram=program)  # merge point here
         op, operand = program[pc]
         if needs_jump(op, operand, storage):
@@ -204,6 +204,19 @@ Done :D
 
 It is 20x faster with JIT now.
 
+BigInt
+----
+First rpython feature after release: [1.2.0][1.2.0].
+
+I found it does not support bigint like pure python version. `rpython.rlib.rbigint` is a bigint library.
+I replaced all of the data type to rbigint. And found it makes code 6-8 times slower.
+Unfortunately aheui is so simple language - it looks hard to optimize it more for bigint.
+Instead of it, I added an abstract layer of bigint. It runs under normal int system basically.
+But there is bigint module and you can replace it to enable bigint support.
+
+Unfortunately, I did not find a way to print bigint object yet. It is calculatable but not printable
+
+
 So...
 ----
 Now I have the world fastest Aheui implementation. This is 20 times faster than C implementation and 2~3 times faster than C transpile implementation for [logo.aheui][logo.aheui].
@@ -224,4 +237,5 @@ Now I understand how to create simple interpreter/vm with JIT with PyPy technolo
 [0.1]: https://github.com/aheui/rpaheui/blob/0.1-pure-rpython/aheui.py
 [0.2]: https://github.com/aheui/rpaheui/blob/0.2-first-jit/aheui.py
 [0.3]: https://github.com/aheui/rpaheui/blob/0.3-world-fastest-aheui/aheui.py
+[1.2.0]: https://github.com/aheui/rpaheui/tree/1.2.0
 [logo.aheui]: https://github.com/aheui/snippets/blob/master/logo/logo.aheui
