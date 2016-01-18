@@ -1,6 +1,8 @@
 알파희 - 알파희썬(rpython)으로 만든 엔터프라이즈급 고성능 아희
 ====
 
+[![Build Status](https://travis-ci.org/aheui/rpaheui.svg?branch=master)](https://travis-ci.org/aheui/rpaheui)
+
 * English: [README.en.md](https://github.com/aheui/rpaheui/blob/master/README.en.md)
 * Working log (English): [LOG.md](https://github.com/aheui/rpaheui/blob/master/LOG.md)
 
