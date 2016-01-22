@@ -71,12 +71,12 @@ sys	0m0.058s
   - `bytecode`: 아희 바이트코드. (`앟셈블리`의 바이트코드 표현형)
   - `asm`: `앟셈블리` 참고
   - usage: `--source=asm`, `-Sbytecode` or `-S text`
-- --target,-S: 결과물 유형. 기본값은 `run`입니다. `run`, `bytecode`, `asm` 가운데 하나를 쓸 수 있습니다.
+- --target,-T: 결과물 유형. 기본값은 `run`입니다. `run`, `bytecode`, `asm` 가운데 하나를 쓸 수 있습니다.
   - `run`: 주어진 코드를 실행합니다.
   - `bytecode`: 아희 바이트코드. (`앟셈블리`의 바이트코드 표현형)
   - `asm`: `앟셈블리` 참고
   - usage: `--target=asm`, `-Tbytecode` or `-T run`
-- --output,-o: 결과물 파일. 기본값은 ``입니다. 각 결과물 유형에 따라 자세한 내용을 확인하세요. `-`이면 표준 출력입니다.
+- --output,-o: 결과물 파일. 기본값은 아래와 같습니다. 각 결과물 유형에 따라 자세한 내용을 확인하세요. `-`이면 표준 출력입니다.
   - --target=run: 이 옵션은 무시됩니다.
   - --target=bytecode: 기본 값은 `.aheuic` 파일입니다.
   - --target=asm: 기본 값은 `.aheuis` 파일입니다.
