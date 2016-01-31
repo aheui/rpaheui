@@ -18,8 +18,8 @@ def get_location(pc, stackok, is_queue, program):
     PYPYLOG=jit-log-opt,jit-backend,jit-summary:<filename>
     """
     op = program.get_op(pc)
-    val = program.get_operand(pc)
-    return "#%d(s%d)_%s_%d" % (pc, stackok, compile.OP_NAMES[op].encode('utf-8'), val)
+    val = ('_%d' % program.get_operand(pc)) if compile.OP_USEVAL[op] else ''
+    return "#%d(s%dq%d)_%s%s" % (pc, stackok, is_queue, compile.OP_NAMES[op].encode('utf-8'), val)
 
 driver = jit.JitDriver(
     greens=['pc', 'stackok', 'is_queue', 'program'],
