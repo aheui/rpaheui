@@ -74,10 +74,10 @@ class Stack(object):
 
     # Tools for common methods. inline?
 
-    def get_2_values(self):
+    def _get_2_values(self):
         return self.pop(), self.head.value
 
-    def put_value(self, value):
+    def _put_value(self, value):
         self.head.value = value
 
     # Common methods from here
@@ -86,35 +86,35 @@ class Stack(object):
         return self.size
 
     def add(self):
-        r1, r2 = self.get_2_values()
+        r1, r2 = self._get_2_values()
         r = bigint.add(r2, r1)
-        self.put_value(r)
+        self._put_value(r)
 
     def sub(self):
-        r1, r2 = self.get_2_values()
+        r1, r2 = self._get_2_values()
         r = bigint.sub(r2, r1)
-        self.put_value(r)
+        self._put_value(r)
 
     def mul(self):
-        r1, r2 = self.get_2_values()
+        r1, r2 = self._get_2_values()
         r = bigint.mul(r2, r1)
-        self.put_value(r)
+        self._put_value(r)
 
     def div(self):
-        r1, r2 = self.get_2_values()
+        r1, r2 = self._get_2_values()
         r = bigint.div(r2, r1)
-        self.put_value(r)
+        self._put_value(r)
 
     def mod(self):
-        r1, r2 = self.get_2_values()
+        r1, r2 = self._get_2_values()
         r = bigint.mod(r2, r1)
-        self.put_value(r)
+        self._put_value(r)
 
     def cmp(self):
-        r1, r2 = self.get_2_values()
+        r1, r2 = self._get_2_values()
         r = int(bigint.ge(r2, r1))
         big_r = bigint.fromint(r)
-        self.put_value(big_r)
+        self._put_value(big_r)
 
 
 class Queue(Stack):
@@ -138,10 +138,10 @@ class Queue(Stack):
         self.head = node
         self.size += 1
 
-    def get_2_values(self):
+    def _get_2_values(self):
         return self.pop(), self.pop()
 
-    def put_value(self, value):
+    def _put_value(self, value):
         self.push(value)
 
 
@@ -184,6 +184,7 @@ class InputBuffer(object):
 
     def look(self, length):
         return self.buf[:length]
+
 
 input_buffer = InputBuffer()
 
@@ -232,7 +233,7 @@ def get_utf8(input_buffer=input_buffer):
 def get_number(input_buffer=input_buffer):
     """Get a number from standard input."""
     input_buffer.load(1)
-    numchar = input_buffer.look(1)
+    numchar = input_buffer.look(1)  # for sign
     negative = numchar == b'-'
     if negative:
         input_buffer.take(1)
