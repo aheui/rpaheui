@@ -610,9 +610,12 @@ class Compiler(object):
         for op, v in lines:
             if op in OP_JUMPS:
                 labels.append(v)
+        unused_labels = []
         for label in self.label_map.keys():
             if label not in labels:
-                del self.label_map[label]
+                unused_labels.append(label)
+        for label in unused_labels:
+            del self.label_map[label]
         self.lines = lines
         if self.debug:
             new_comments = [self.debug.comments[h] for h in hints]
