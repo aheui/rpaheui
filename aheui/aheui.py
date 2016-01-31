@@ -240,10 +240,13 @@ def get_number(input_buffer=input_buffer):
     numchars = []
     while True:
         input_buffer.load(1)
-        numchar = input_buffer.take(1)
+        numchar = input_buffer.look(1)
         if numchar not in [b'1', b'2', b'3', b'4', b'5', b'6', b'7', b'8', b'9', b'0']:
+            if numchar in [b' ', b'\t', b'\n']:
+                input_buffer.take(1)
             break
         else:
+            input_buffer.take(1)
             numchars.append(numchar)
     assert len(numchars) > 0
     if negative:
