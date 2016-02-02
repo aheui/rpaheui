@@ -38,18 +38,11 @@ class Link(object):
         self.next = next
 
 
-class Stack(object):
-    """Base data storage for Aheui, except for ieung and hieuh."""
+class LinkedList(object):
+    """Common linked list for storages"""
 
-    def __init__(self):
-        self.head = None
-        self.size = 0
-
-    def push(self, value):
-        # assert(isinstance(value, int))
-        node = Link(self.head, value)
-        self.head = node
-        self.size += 1
+    def __len__(self):
+        return self.size
 
     def pop(self):
         node = self.head
@@ -59,31 +52,15 @@ class Stack(object):
         self.size -= 1
         return value
 
-    def pop_longlong(self):
-        big_r = self.pop()
-        r = bigint.tolonglong(big_r)
-        return r
-
-    def dup(self):
-        self.push(self.head.value)
-
     def swap(self):
         node1 = self.head
         node2 = node1.next
         node1.value, node2.value = node2.value, node1.value
 
-    # Tools for common methods. inline?
-
-    def _get_2_values(self):
-        return self.pop(), self.head.value
-
-    def _put_value(self, value):
-        self.head.value = value
-
-    # Common methods from here
-
-    def __len__(self):
-        return self.size
+    def pop_longlong(self):
+        big_r = self.pop()
+        r = bigint.tolonglong(big_r)
+        return r
 
     def add(self):
         r1, r2 = self._get_2_values()
@@ -117,7 +94,32 @@ class Stack(object):
         self._put_value(big_r)
 
 
-class Queue(Stack):
+class Stack(LinkedList):
+    """Base data storage for Aheui, except for ieung and hieuh."""
+
+    def __init__(self):
+        self.head = None
+        self.size = 0
+
+    def push(self, value):
+        # assert(isinstance(value, int))
+        node = Link(self.head, value)
+        self.head = node
+        self.size += 1
+
+    def dup(self):
+        self.push(self.head.value)
+
+    # Tools for common methods. inline?
+
+    def _get_2_values(self):
+        return self.pop(), self.head.value
+
+    def _put_value(self, value):
+        self.head.value = value
+
+
+class Queue(LinkedList):
 
     def __init__(self):
         self.tail = Link(None)
@@ -145,8 +147,28 @@ class Queue(Stack):
         self.push(value)
 
 
-class Port(Stack):
-    pass
+class Port(LinkedList):
+
+    def __init__(self):
+        self.head = None
+        self.size = 0
+        self.last_push = 0
+
+    def push(self, value):
+        # assert(isinstance(value, int))
+        node = Link(self.head, value)
+        self.head = node
+        self.size += 1
+        self.last_push = value
+
+    def dup(self):
+        self.push(self.last_push)
+
+    def _get_2_values(self):
+        return self.pop(), self.head.value
+
+    def _put_value(self, value):
+        self.head.value = value
 
 
 class Storage(object):
