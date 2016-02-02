@@ -190,7 +190,7 @@ input_buffer = InputBuffer()
 
 
 @jit.dont_look_inside
-def get_utf8(input_buffer=input_buffer):
+def read_utf8(input_buffer=input_buffer):
     """Get a utf-8 character from standard input.
 
     The length of utf-8 character is detectable in first byte.
@@ -230,7 +230,7 @@ def get_utf8(input_buffer=input_buffer):
 
 
 @jit.dont_look_inside
-def get_number(input_buffer=input_buffer):
+def read_number(input_buffer=input_buffer):
     """Get a number from standard input."""
     input_buffer.load(1)
     numchar = input_buffer.look(1)  # for sign
@@ -253,6 +253,19 @@ def get_number(input_buffer=input_buffer):
         numchars.insert(0, b'-')
     num = bigint.fromstr(b''.join(numchars))
     return num
+
+
+@jit.dont_look_inside
+def write_number(value):
+    os.write(outfp, _unicode(value).encode('utf-8'))
+
+
+@jit.dont_look_inside
+def write_utf8(value):
+    if not (0 <= value < 0x110000):
+        os.write(errfp, b'[Warning] Undefined behavior: unicode %x out of range\n' % value)
+        value = 0xfffd
+    os.write(outfp, unichr(value).encode('utf-8'))
 
 
 class Program(object):
@@ -296,6 +309,7 @@ def mainloop(program, debug):
     storage = jit.promote(storage)
     selected = storage[0]
     jit.assert_green(selected)
+
     while pc < program.size:
         #  debug.storage(storage, selected)
         #  raw_input()
@@ -359,23 +373,15 @@ def mainloop(program, debug):
                 continue
         elif op == c.OP_POPNUM:
             r = selected.pop_longlong()
-            os.write(outfp, _unicode(r).encode('utf-8'))
+            write_number(r)
         elif op == c.OP_POPCHAR:
             r = selected.pop_longlong()
-            os.write(outfp, unichr(r).encode('utf-8'))
-        elif op == c.OP_JMP:
-            value = program.get_label(pc)
-            pc = value
-            stackok = program.get_req_size(pc) <= stacksize
-            driver.can_enter_jit(
-                pc=pc, stackok=stackok, is_queue=is_queue, program=program,
-                stacksize=stacksize, storage=storage, selected=selected)
-            continue
+            write_utf8(r)
         elif op == c.OP_PUSHNUM:
-            num = get_number()
+            num = read_number()
             selected.push(num)
         elif op == c.OP_PUSHCHAR:
-            char = get_utf8()
+            char = read_utf8()
             selected.push(char)
         elif op == c.OP_NONE:
             pass
