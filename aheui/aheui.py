@@ -386,7 +386,7 @@ def mainloop(program, debug):
         elif op == c.OP_HALT:
             break
         else:
-            os.write(errfp, 'Missing operator: %d' % op)
+            os.write(errfp, (u'Missing operator: %s' % _unicode(op)).encode('utf-8'))
             assert False
         pc += 1
 
