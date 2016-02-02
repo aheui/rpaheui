@@ -352,18 +352,16 @@ def mainloop(program, debug):
             storage[value].push(r)
         elif op == c.OP_CMP:
             selected.cmp()
-        elif op == c.OP_BRZ:
-            r = selected.pop_longlong()
-            if r == 0:
-                value = program.get_label(pc)
-                pc = value
-                stackok = program.get_req_size(pc) <= stacksize
-                driver.can_enter_jit(
-                    pc=pc, stackok=stackok, is_queue=is_queue, program=program,
-                    stacksize=stacksize, storage=storage, selected=selected)
-                continue
-        elif op == c.OP_BRPOP1 or op == c.OP_BRPOP2:
-            if not stackok:
+        elif op == c.OP_BRPOP1 or op == c.OP_BRPOP2 or op == c.OP_JMP or op == c.OP_BRZ:
+            if op == c.OP_BRPOP1 or op == c.OP_BRPOP2:
+                jump = not stackok
+            elif op == c.OP_JMP:
+                jump = True
+            elif op == c.OP_BRZ:
+                jump = 0 == selected.pop_longlong()
+            else:
+                assert False
+            if jump:
                 value = program.get_label(pc)
                 pc = value
                 stackok = program.get_req_size(pc) <= stacksize
