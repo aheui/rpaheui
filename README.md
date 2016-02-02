@@ -32,28 +32,22 @@ JIT로 속도 올리기
 
 PyPy 기술은 PyPy를 CPython보다 빠르게 동작하게 만듭니다. ([http://speed.pypy.org/](http://speed.pypy.org/) 참고)
 
-알파희도 이 기술을 이용해 JIT로 빨라지고 있습니다. 벤치마크에 널리 쓰이는 로고 실행이 caheui보다 20배가량 더 빠릅니다!
+알파희도 이 기술을 이용해 JIT로 빨라지고 있습니다. 벤치마크에 널리 쓰이는 로고 실행이 caheui보다 30배 이상 더 빠릅니다!
 
 ```
-$ time AHEUI=../rpaheui/aheui-c ./test.sh logo/
-testset: logo/
-  test logo...success!
-test status: 1/1
+$ time ./rpaheui-c snippets/logo/logo.aheui > /dev/null
 
-real	0m1.795s
-user	0m1.087s
-sys	0m1.262s
+real    0m0.915s
+user    0m0.640s
+sys 0m0.269s
 ```
 
 ```
-$ time AHEUI=../caheui/aheui ./test.sh logo/
-testset: logo/
-  test logo...success!
-test status: 1/1
+$ time ../caheui/aheui snippets/logo/logo.aheui > /dev/null
 
-real	0m23.953s
-user	0m23.843s
-sys	0m0.058s
+real    0m26.026s
+user    0m25.970s
+sys 0m0.035s
 ```
 
 실행 옵션
