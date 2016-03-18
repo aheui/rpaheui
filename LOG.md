@@ -1,5 +1,7 @@
-Aheui JIT interpreter with pypy/rpython
+PyPy/RPython tutorial - Aheui JIT interpreter with pypy/rpython
 ====
+
+This is a PyPy tutorial to write a JIT interpreter.
 
 - What is Aheui? Esolang, using Hangul. See [http://aheui.github.io/specification.en/][spec]
 - What is rpython? Restricted Python, for/by PyPy technology. See [Wikipedia][pypywp] or [Documentation][pypydoc]
