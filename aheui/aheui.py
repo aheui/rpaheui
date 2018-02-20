@@ -291,7 +291,7 @@ def write_utf8(value):
 
 
 class Program(object):
-    _immutable_fields_ = ['labels[*]', 'opcodes[*]', 'values[*]', 'size']
+    _immutable_fields_ = ['labels[**]', 'opcodes[*]', 'values[*]', 'size']
 
     def __init__(self, lines, label_map):
         self.opcodes = [l[0] for l in lines]
