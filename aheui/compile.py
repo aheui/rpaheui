@@ -437,7 +437,7 @@ class Compiler(object):
                 min_stacksize = min_stacksize_map[pc]
                 if min_stacksize >= 0:
                     min_diff = min_stacksize - stacksize
-                    if min_diff <= c.OP_STACKADD[op] - c.OP_STACKDEL[op]:
+                    if min_diff <= 0 and min_diff <= c.OP_STACKADD[op] - c.OP_STACKDEL[op]:
                         break
                 if op == c.OP_BRPOP1 or op == c.OP_BRPOP2:
                     reqsize = c.OP_REQSIZE[op]
