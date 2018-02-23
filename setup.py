@@ -16,6 +16,10 @@ def get_readme():
         return ''
 
 
+tests_require = [
+    'flake8', 'tox', 'pytest>=3.0.1',
+]
+
 setup(
     name='aheui',
     version=get_version(),
@@ -33,9 +37,10 @@ setup(
     },
     install_requires=[
     ],
-    tests_require=[
-        'flake8', 'tox', 'pytest',
-    ],
+    tests_require=tests_require,
+    extras_require={
+        'tests': tests_require,
+    },
     scripts=[
         'bin/aheui-py',
         'bin/aheui',
@@ -49,5 +54,6 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ],
 )

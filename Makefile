@@ -27,6 +27,6 @@ test:
 	cd snippets && AHEUI="../rpaheui-c" bash test.sh
 
 testpy:
-	py.test
+	pytest
 	if [ -e snippets ]; then cd snippets && git pull; else git clone https://github.com/aheui/snippets; fi
 	cd snippets && AHEUI=../rpaheui.py bash test.sh

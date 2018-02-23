@@ -10,7 +10,7 @@ except ImportError:
     DEBUG = False
 
 import os
-from aheui.const import *
+import aheui.const as c
 from aheui._compat import unichr, _unicode
 
 
@@ -111,10 +111,10 @@ class Debug(object):
                 items.append(str(node.value))
                 node = node.next
             return '[' + ', '.join(items) + ']'
-        for i, l in enumerate(storage):
-            marker = u':' if l == selected else u' '
+        for i, space in enumerate(storage):
+            marker = u':' if space == selected else u' '
             os.write(2, (u'%s (%s):%s' % (unichr(0x11a8 + i - 1), _unicode(i), marker)).encode('utf-8'))
-            os.write(2, (u'%s\n' % _list(l)).encode('utf-8'))
+            os.write(2, (u'%s\n' % _list(space)).encode('utf-8'))
 
 
 class PrimitiveProgram(object):
@@ -283,7 +283,7 @@ class Compiler(object):
                         target = index
                     label_id = len(lines)
                     label_map[label_id] = target
-                    add(lines, OP_JMP, label_id, 'jump label for %s %s' % (position, direction))
+                    add(lines, c.OP_JMP, label_id, 'jump label for %s %s' % (position, direction))
                     break
 
                 code_map[position, direction, step] = len(lines)
@@ -291,35 +291,35 @@ class Compiler(object):
                 direction = new_direction
                 step = new_step
                 if OP_HASOP[op]:
-                    if op == OP_POP:
+                    if op == c.OP_POP:
                         if val == VAL_NUMBER:
-                            op = OP_POPNUM
+                            op = c.OP_POPNUM
                         elif val == VAL_UNICODE:
-                            op = OP_POPCHAR
+                            op = c.OP_POPCHAR
                         else:
                             pass
-                    elif op == OP_PUSH:
+                    elif op == c.OP_PUSH:
                         if val == VAL_NUMBER:
-                            op = OP_PUSHNUM
+                            op = c.OP_PUSHNUM
                         elif val == VAL_UNICODE:
-                            op = OP_PUSHCHAR
+                            op = c.OP_PUSHCHAR
                         else:
                             pass
                     else:
                         pass
 
-                    if op == OP_PUSH:
+                    if op == c.OP_PUSH:
                         add(lines, op, VAL_CONSTS[val])
                     else:
-                        req_size = OP_REQSIZE[op]
+                        req_size = c.OP_REQSIZE[op]
                         if req_size > 0:
-                            brop = OP_BRPOP1 if req_size == 1 else OP_BRPOP2
+                            brop = c.OP_BRPOP1 if req_size == 1 else c.OP_BRPOP2
                             idx = len(lines)
                             code_map[position, direction + 10, step] = idx  # mark branch
                             add(lines, brop, idx, 'brpop')
                             code_map[position, direction, step] = idx + 1  # mark code
                             if OP_USEVAL[op]:
-                                if op == OP_BRZ:
+                                if op == c.OP_BRZ:
                                     add(lines, op, idx, 'brpop-brz')
                                     alt_position = primitive.advance_position(position, -direction, step)
                                     #  print 'enqueue:', alt_position, DIR_NAMES[-direction], step, idx
@@ -337,7 +337,7 @@ class Compiler(object):
                                 add(lines, op, val, 'safe-useval')
                             else:
                                 add(lines, op, -1, 'safe-noval')
-                                if op == OP_HALT:
+                                if op == c.OP_HALT:
                                     break
                 position = primitive.advance_position(position, direction, step)
         return lines, label_map, code_map
@@ -385,7 +385,7 @@ class Compiler(object):
                 continue
             new.append((op, val))
             new_comments.append([])
-            if op in OP_JUMPS:
+            if op in c.OP_JUMPS:
                 target_idx = self.label_map[val]
                 new_target_idx = target_idx - useless_map[target_idx]
                 new_label_map[val] = new_target_idx
@@ -408,7 +408,7 @@ class Compiler(object):
     def optimize_jump(self):
         for label, direct_target in self.label_map.items():
             op, operand = self.lines[direct_target]
-            if op == OP_JMP:
+            if op == c.OP_JMP:
                 indirect_target = self.label_map[operand]
                 self.label_map[label] = indirect_target
 
@@ -427,56 +427,57 @@ class Compiler(object):
         5. Stop if OP_HALT.
         6. Drop useless OP_BRPOPs and any codes out of path.
         """
-        minstacksize_map = [-1] * len(self.lines)
+        min_stacksize_map = [-1] * len(self.lines)
         job_queue = [(0, 0)]
 
         while len(job_queue) > 0:
             pc, stacksize = job_queue.pop(0)
             while pc < len(self.lines):
                 op, val = self.lines[pc]
-                minstacksize = minstacksize_map[pc]
-                if minstacksize >= 0:
-                    if minstacksize <= stacksize - OP_STACKDEL[op] + OP_STACKADD[op]:
+                min_stacksize = min_stacksize_map[pc]
+                if min_stacksize >= 0:
+                    min_diff = min_stacksize - stacksize
+                    if min_diff <= 0 and min_diff <= c.OP_STACKADD[op] - c.OP_STACKDEL[op]:
                         break
-                if op == OP_BRPOP1 or op == OP_BRPOP2:
-                    reqsize = OP_REQSIZE[op]
+                if op == c.OP_BRPOP1 or op == c.OP_BRPOP2:
+                    reqsize = c.OP_REQSIZE[op]
                     if stacksize >= reqsize:
                         pc += 1
                         continue
                     else:
-                        minstacksize_map[pc] = stacksize
+                        min_stacksize_map[pc] = stacksize
                         job_queue.append((self.label_map[val], stacksize))
                 else:
-                    minstacksize_map[pc] = stacksize
-                    stacksize -= OP_STACKDEL[op]
+                    min_stacksize_map[pc] = stacksize  # min(min_stacksize, stacksize)
+                    stacksize -= c.OP_STACKDEL[op]
                     if stacksize < 0:
                         stacksize = 0
-                    stacksize += OP_STACKADD[op]
-                    if op == OP_BRZ:
+                    stacksize += c.OP_STACKADD[op]
+                    if op == c.OP_BRZ:
                         job_queue.append((self.label_map[val], stacksize))
-                    elif op == OP_JMP:
+                    elif op == c.OP_JMP:
                         pc = self.label_map[val]
                         continue
-                    elif op == OP_SEL:
-                        minstacksize_map[pc] = stacksize
+                    elif op == c.OP_SEL:
+                        min_stacksize_map[pc] = stacksize
                         stacksize = 0
-                    elif op == OP_MOV:
-                        pass
-                    elif op == OP_HALT:
+                    elif op == c.OP_MOV:
+                        pass  # stacksize += 1
+                    elif op == c.OP_HALT:
                         break
                 pc += 1
 
-        reachability = [int(size >= 0) for size in minstacksize_map]
+        reachability = [int(size >= 0) for size in min_stacksize_map]
         return reachability
 
     def optimize_deadcode2(self):
-        minstacksize_map = [[-1] * STORAGE_COUNT] * len(self.lines)
-        job_queue = [(0, 0, [0] * STORAGE_COUNT)]
+        min_stacksize_map = [[-1] * c.STORAGE_COUNT] * len(self.lines)
+        job_queue = [(0, 0, [0] * c.STORAGE_COUNT)]
 
         def min_list(l1, l2):
             if l1[0] == -1:
                 return l2[:]
-            return [min(l1[i], l2[i]) for i in range(0, STORAGE_COUNT)]
+            return [min(l1[i], l2[i]) for i in range(0, c.STORAGE_COUNT)]
 
         while len(job_queue) > 0:
             pc, selected, stacksizes = job_queue.pop(0)
@@ -484,40 +485,41 @@ class Compiler(object):
                 stacksize = stacksizes[selected]
                 assert stacksize >= 0
                 op, val = self.lines[pc]
-                minstacksizes = minstacksize_map[pc]
-                if minstacksizes[selected] >= 0:
-                    if minstacksizes[selected] <= stacksizes[selected] - OP_STACKDEL[op] + OP_STACKADD[op] and min_list(minstacksizes, stacksizes) == minstacksizes:
+                min_stacksizes = min_stacksize_map[pc]
+                if min_stacksizes[selected] >= 0:
+                    min_diff = min_stacksizes[selected] - stacksizes[selected]
+                    if min_diff <= - c.OP_STACKDEL[op] + c.OP_STACKADD[op] and min_list(min_stacksizes, stacksizes) == min_stacksizes:
                         break
-                if op == OP_BRPOP1 or op == OP_BRPOP2:
-                    reqsize = OP_REQSIZE[op]
+                if op == c.OP_BRPOP1 or op == c.OP_BRPOP2:
+                    reqsize = c.OP_REQSIZE[op]
                     if stacksize >= reqsize:
                         pc += 1
                         continue
                     else:
-                        minstacksize_map[pc] = min_list(minstacksizes, stacksizes)
+                        min_stacksize_map[pc] = min_list(min_stacksizes, stacksizes)
                         job_queue.append((self.label_map[val], selected, stacksizes[:]))
                 else:
-                    minstacksize_map[pc] = min_list(minstacksizes, stacksizes)
-                    stacksize -= OP_STACKDEL[op]
+                    min_stacksize_map[pc] = min_list(min_stacksizes, stacksizes)
+                    stacksize -= c.OP_STACKDEL[op]
                     if stacksize < 0:
                         stacksize = 0
-                    stacksize += OP_STACKADD[op]
+                    stacksize += c.OP_STACKADD[op]
                     stacksizes[selected] = stacksize
-                    if op == OP_BRZ:
+                    if op == c.OP_BRZ:
                         job_queue.append((self.label_map[val], selected, stacksizes[:]))
-                    elif op == OP_JMP:
+                    elif op == c.OP_JMP:
                         pc = self.label_map[val]
                         continue
-                    elif op == OP_SEL:
-                        minstacksize_map[pc] = min_list(minstacksizes, stacksizes)
+                    elif op == c.OP_SEL:
+                        min_stacksize_map[pc] = min_list(min_stacksizes, stacksizes)
                         selected = val
-                    elif op == OP_MOV:
+                    elif op == c.OP_MOV:
                         stacksizes[val] += 1
-                    elif op == OP_HALT:
+                    elif op == c.OP_HALT:
                         break
                 pc += 1
 
-        reachability = [int(sizes[0] >= 0) for sizes in minstacksize_map]
+        reachability = [int(sizes[0] >= 0) for sizes in min_stacksize_map]
         return reachability
 
     def optimize_order(self):
@@ -527,7 +529,7 @@ class Compiler(object):
             jump_map = {}
             jump_rmap = {}
             for dep, (op, v) in enumerate(lines):
-                if op == OP_JMP:
+                if op == c.OP_JMP:
                     dest = self.label_map[v]
                     jump_map[dep] = dest
                     if dest in jump_rmap:
@@ -552,7 +554,7 @@ class Compiler(object):
                     if ix in jump_rmap:
                         ix = -1
                         break
-                    if lines[ix][0] in OP_BRANCHES:
+                    if lines[ix][0] in c.OP_BRANCHES:
                         ix = -1
                         break
                 else:
@@ -608,7 +610,7 @@ class Compiler(object):
                 break
         labels = []
         for op, v in lines:
-            if op in OP_JUMPS:
+            if op in c.OP_JUMPS:
                 labels.append(v)
         unused_labels = []
         for label in self.label_map.keys():
@@ -651,18 +653,18 @@ class Compiler(object):
                     if in_queue == 0 or queue_map[pc] == 1:
                         break
                 queue_map[pc] = in_queue
-                if op in [OP_BRZ, OP_BRPOP1, OP_BRPOP2]:
+                if op in [c.OP_BRZ, c.OP_BRPOP1, c.OP_BRPOP2]:
                     job_queue.append((pc + 1, in_queue))
                     job_queue.append((self.label_map[val], in_queue))
                     break
-                elif op == OP_JMP:
+                elif op == c.OP_JMP:
                     job_queue.append((self.label_map[val], in_queue))
                     break
                 else:
                     pc += 1
-                    if op == OP_SEL:
-                        in_queue = int(val == VAL_QUEUE or val == VAL_PORT)
-                    elif op == OP_HALT:
+                    if op == c.OP_SEL:
+                        in_queue = int(val == c.VAL_QUEUE or val == c.VAL_PORT)
+                    elif op == c.OP_HALT:
                         break
 
         if self.debug:
@@ -684,15 +686,15 @@ class Compiler(object):
             for i in range(1, len(lines)):
                 op, val = lines[i]
                 i1 = i - 1
-                while lines[i1][0] == OP_NONE and i1 >= 0:
+                while lines[i1][0] == c.OP_NONE and i1 >= 0:
                     i1 -= 1
                 if queue_map[i] or queue_map[i1]:
                     continue
                 if i in label_targets:
                     continue
-                if op == OP_DUP:
+                if op == c.OP_DUP:
                     inst1 = lines[i1]
-                    if inst1[0] == OP_PUSH:
+                    if inst1[0] == c.OP_PUSH:
                         lines[i] = lines[i1]
                     continue
 
@@ -700,19 +702,19 @@ class Compiler(object):
             op, v = lines[i]
             i1 = i - 1
 
-            while lines[i1][0] == OP_NONE and i1 >= 1:
+            while lines[i1][0] == c.OP_NONE and i1 >= 1:
                 i1 -= 1
             i2 = i1 - 1
-            while lines[i1][0] == OP_NONE and i2 >= 0:
+            while lines[i1][0] == c.OP_NONE and i2 >= 0:
                 i2 -= 1
             op1, v1 = lines[i1]
             op2, v2 = lines[i2]
-            if not op2 == OP_PUSH:
+            if not op2 == c.OP_PUSH:
                 continue
 
-            if op1 == OP_PUSH:
+            if op1 == c.OP_PUSH:
                 pass
-            elif op1 == OP_DUP:
+            elif op1 == c.OP_DUP:
                 v1 = v2
             else:
                 continue
@@ -729,35 +731,35 @@ class Compiler(object):
             if i1 in label_targets or i in label_targets:
                 #  print 'has jump label'
                 continue
-            is_jmp = op == OP_JMP
+            is_jmp = op == c.OP_JMP
             if is_jmp:
                 target = self.label_map[v]
                 #  print v, target, label_rmap[target]
                 if label_rmap[target] == v:
                     op, v = lines[target]
-            if op not in OP_BINARYOPS:
+            if op not in c.OP_BINARYOPS:
                 #  print 'not binops'
                 continue
 
-            if op == OP_ADD:
+            if op == c.OP_ADD:
                 v = v2 + v1
-            elif op == OP_SUB:
+            elif op == c.OP_SUB:
                 v = v2 - v1
-            elif op == OP_MUL:
+            elif op == c.OP_MUL:
                 v = v2 * v1
-            elif op == OP_DIV:
+            elif op == c.OP_DIV:
                 v = v2 // v1
-            elif op == OP_MOD:
+            elif op == c.OP_MOD:
                 v = v2 % v1
-            elif op == OP_CMP:
+            elif op == c.OP_CMP:
                 v = int(v2 >= v1)
             else:
                 assert False
 
             #  print 'optimized!'
             if is_jmp:
-                lines[i1] = (OP_PUSH, v)
-                lines[i2] = (OP_NONE, -1)
+                lines[i1] = (c.OP_PUSH, v)
+                lines[i2] = (c.OP_NONE, -1)
                 reachability[i2] = 0
                 jv = lines[i][1]
                 target = self.label_map[jv]
@@ -772,9 +774,9 @@ class Compiler(object):
                 #  self.debug.show(i1)
                 #  self.debug.show(i)
             else:
-                lines[i] = (OP_PUSH, v)
-                lines[i1] = (OP_NONE, -1)
-                lines[i2] = (OP_NONE, -1)
+                lines[i] = (c.OP_PUSH, v)
+                lines[i1] = (c.OP_NONE, -1)
+                lines[i2] = (c.OP_NONE, -1)
                 reachability[i1] = 0
                 reachability[i2] = 0
                 #  self.debug.show(i)
@@ -785,7 +787,7 @@ class Compiler(object):
         """Write bytecodes data text."""
         codes = []
         for op, val in self.lines:
-            if op in OP_JUMPS:
+            if op in c.OP_JUMPS:
                 val = self.label_map[val]
             if val >= 0:
                 p_val = chr(val & 0xff) + chr((val & 0xff00) >> 8) + chr((val & 0xff0000) >> 16)
@@ -818,7 +820,7 @@ class Compiler(object):
             if op > 128:
                 op -= 256
             self.lines.append((op, val))
-            if op in OP_JUMPS:
+            if op in c.OP_JUMPS:
                 self.label_map[val] = val
 
     def write_asm(self, fp=1):
@@ -836,7 +838,7 @@ class Compiler(object):
             if code is None:
                 code = u'inst%s' % _unicode(op)
             if OP_USEVAL[op]:
-                if op in OP_JUMPS:
+                if op in c.OP_JUMPS:
                     slabel = padding(_unicode(self.label_map[val]), 3)
                     code_val = u'%s L%s' % (code, slabel)
                 else:
@@ -881,7 +883,7 @@ class Compiler(object):
             opcode = OPCODE_MAP[opname]
             val = parts[-1]
             try:
-                if opcode in OP_JUMPS:
+                if opcode in c.OP_JUMPS:
                     if val in label_map:
                         target = label_map[val]
                     else:

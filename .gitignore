@@ -4,5 +4,9 @@
 *-c
 *.egg-info
 dist
+build
 .env*
 .ropeproject
+.cache
+.python-version
+.tox

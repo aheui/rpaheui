@@ -133,6 +133,7 @@ class ArgumentParser(object):
             os.write(2, '%s: error: %s\n' % (prog, e.message()))
         return {}, []
 
+
 parser = ArgumentParser(prog='aheui')
 parser.add_argument('--opt', '-O', default='2', choices='0,1,2', description='Set optimization level.', full_description="""\t0: No optimization.
 \t1: Quickly resolve deadcode by rough stacksize emulation and merge constant operations.

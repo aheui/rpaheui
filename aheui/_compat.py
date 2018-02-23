@@ -39,8 +39,10 @@ try:
     ord = ord
 except NameError:
     long = int
+
     def unichr(n):  # not rpython but python3
         return chr(n)
+
     ord3 = ord
 
     def ord(n):
