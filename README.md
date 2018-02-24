@@ -75,7 +75,8 @@ sys 0m0.035s
   - --target=bytecode: 기본 값은 `.aheuic` 파일입니다.
   - --target=asm: 기본 값은 `.aheuis` 파일입니다.
 - --cmd,-c: 코드를 파일 대신 문자열로 받아 넘겨줍니다.
-- --no-c: `.aheuic` 파일을 자동으로 생성하지않습니다.
+- --omit-comment: `앟셈블리`로 출력할 때 주석을 생성하지 않습니다.
+- --no-c: `.aheuic` 파일을 자동으로 생성하지 않습니다.
   - `.aheuic` 파일은 왜 생성되나요?: [https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35](https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35)
 
 앟셈블리와 ahsembler

@@ -466,6 +466,7 @@ def process_opt(argv):
     target = kwargs['target']
     need_aheuic = target == 'run' and kwargs['no-c'] == 'no'\
         and filename != '-' and not filename.endswith('.aheuic')
+    comment_aheuis = target == 'asm' and kwargs['omit-comment'] == 'no'
 
     if need_aheuic:
         aheuic_output = filename
@@ -496,7 +497,7 @@ def process_opt(argv):
             os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "run"\n')
             raise SystemExit()
 
-    return cmd, source, contents, opt_level, target, aheuic_output, output
+    return cmd, source, contents, opt_level, target, aheuic_output, comment_aheuis, output
 
 
 def open_w(filename):
@@ -537,7 +538,7 @@ def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None):
 
 def entry_point(argv):
     try:
-        cmd, source, contents, str_opt_level, target, aheuic_output, output = process_opt(argv)
+        cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output = process_opt(argv)
     except SystemExit:
         return 1
 
@@ -547,7 +548,7 @@ def entry_point(argv):
         program = Program(compiler.lines, compiler.label_map)
         exitcode = mainloop(program, compiler.debug)
     elif target == 'asm':
-        asm = compiler.write_asm().encode('utf-8')
+        asm = compiler.write_asm(commented=comment_aheuis).encode('utf-8')
         os.write(outfp, asm)
         os.close(outfp)
         exitcode = 0

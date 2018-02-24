@@ -154,6 +154,7 @@ parser.add_argument('--output', '-o', default='', description='Output file. Defa
 \t- `asm` target: Default value is `.aheuis`
 """)
 parser.add_argument('--cmd', '-c', default='', description='Program passed in as string')
+parser.add_argument('--omit-comment', '--omit-comment', narg='0', default='no', description='Do not generate comments while asm target.')
 parser.add_argument('--no-c', '--no-c', narg='0', default='no', description='Do not generate `.aheuic` file automatically.', full_description='\tWhat is .aheuic? https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35\n')
 parser.add_argument('--version', '-v', narg='-1', default='no', description='Show program version', message=VERSION)
 parser.add_argument('--help', '-h', narg='-1', default='no', description='Show this help text')
