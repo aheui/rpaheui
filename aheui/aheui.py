@@ -333,10 +333,22 @@ def mainloop(program, debug):
     selected = storage[0]
     jit.assert_green(selected)
 
+    # debug_skip = 0
+    # runtime_counter = 0
     while pc < program.size:
+        '''
         #  debug.storage(storage, selected)
-        #  raw_input()
-        #  debug.show(pc)
+        runtime_counter += 1
+        os.write(errfp, b'%8d\t' % runtime_counter)
+        debug.show(pc)
+        if debug_skip <= 0:
+            raw_debug_skip = raw_input()
+            if not raw_debug_skip:
+                raw_debug_skip = '0'
+            debug_skip = int(raw_debug_skip)
+        else:
+            debug_skip -= 1
+        '''
         stackok = program.get_req_size(pc) <= stacksize
         driver.jit_merge_point(
             pc=pc, stackok=stackok, is_queue=is_queue, program=program,
