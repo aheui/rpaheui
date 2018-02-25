@@ -466,7 +466,6 @@ def process_opt(argv):
     target = kwargs['target']
     need_aheuic = target == 'run' and kwargs['no-c'] == 'no'\
         and filename != '-' and not filename.endswith('.aheuic')
-    comment_aheuis = target == 'asm' and kwargs['omit-comment'] == 'no'
 
     if need_aheuic:
         aheuic_output = filename
@@ -478,6 +477,7 @@ def process_opt(argv):
         aheuic_output = None
 
     output = kwargs['output']
+    comment_aheuis = False
     if output == '':
         if target == 'bytecode':
             output = filename
@@ -485,16 +485,17 @@ def process_opt(argv):
                 output += 'c'
             else:
                 output += '.aheuic'
-        elif target == 'asm':
+        elif target in ['asm', 'asm+comment']:
             output = filename
             if output.endswith('.aheui'):
                 output += 's'
             else:
                 output += '.aheuis'
+            comment_aheuis = target == 'asm+comment'
         elif target == 'run':
             output = '-'
         else:
-            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "run"\n')
+            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "asm+comment", "run"\n')
             raise SystemExit()
 
     return cmd, source, contents, opt_level, target, aheuic_output, comment_aheuis, output
@@ -547,7 +548,7 @@ def entry_point(argv):
     if target == 'run':
         program = Program(compiler.lines, compiler.label_map)
         exitcode = mainloop(program, compiler.debug)
-    elif target == 'asm':
+    elif target in ['asm', 'asm+comment']:
         asm = compiler.write_asm(commented=comment_aheuis).encode('utf-8')
         os.write(outfp, asm)
         os.close(outfp)
