@@ -24,7 +24,7 @@ VAL_CONSTS = [0, 2, 4, 4, 2, 5, 5, 3, 5, 7, 9, 9, 7, 9, 9, 8, 4, 4, 6, 2, 4, 1, 
 VAL_NUMBER = 21
 VAL_UNICODE = 27
 
-
+MV_NONE = -1
 MV_RIGHT = 0  # ㅏ
 # ㅐ
 MV_RIGHT2 = 2  # ㅑ
@@ -88,11 +88,15 @@ class Debug(object):
         for (pos, dir, step), i in code_map.items():
             if dir >= 3:
                 continue
-            self.comments[i].append(primitive.pane[pos])
+            char = primitive.pane[pos]
+            if char != u'\0':
+                self.comments[i].append(char)
+
             srow = padding(_unicode(pos[0]), 3, left=False)
             scol = padding(_unicode(pos[1]), 3, left=False)
             sdir = padding(DIR_NAMES[dir], 5)
-            self.comments[i].append(u'[%s,%s] %s%s' % (srow, scol, sdir, _unicode(step)))
+            self.comments[i].append(
+                u'[%s,%s] %s%s' % (srow, scol, sdir, _unicode(step)))
 
     def comment(self, i):
         return u' / '.join(self.comments[i])
@@ -100,7 +104,7 @@ class Debug(object):
     def show(self, pc, fp=2):
         op, value = self.lines[pc]
         os.write(fp, (u'L%s %s(%s) %s ;' % (_unicode(pc), OP_NAMES[op], unichr(0x1100 + op), value if OP_USEVAL[op] else '')).encode('utf-8'))
-        os.write(fp, self.comment(pc))
+        os.write(fp, self.comment(pc).encode('utf-8'))
         os.write(fp, '\n')
 
     def storage(self, storage, selected=None):
@@ -133,6 +137,8 @@ class PrimitiveProgram(object):
                 continue
             if u'가' <= char <= u'힣':
                 self.pane[pc_row, pc_col] = char
+            else:
+                self.pane[pc_row, pc_col] = '\0'  # to mark empty space
             pc_col += 1
         max_col = max(max_col, pc_col)
 
@@ -140,7 +146,9 @@ class PrimitiveProgram(object):
         self.max_col = max_col
 
     def decode(self, position):
-        code = self.pane[position]
+        code = self.pane.get(position, '\0')
+        if code == u'\0':
+            return c.OP_NONE, MV_NONE, -1  # do nothing
         base = ord(code) - ord(u'가')
         op_code = base // 588
         mv_code = (base // 28) % 21
@@ -154,6 +162,8 @@ class PrimitiveProgram(object):
             r += step
             if r > self.max_row:
                 r = 0
+                while (r, c) not in self.pane:
+                    r += 1
             p = r, c
         elif d == DIR_RIGHT:
             c += step
@@ -164,15 +174,19 @@ class PrimitiveProgram(object):
             r -= step
             if r < 0:
                 r = self.max_row
+                while (r, c) not in self.pane:
+                    r -= 1
             p = r, c
         elif d == DIR_LEFT:
             c -= step
             if c < 0:
                 c = self.max_col
+                while (r, c) not in self.pane:
+                    c -= 1
             p = r, c
         else:
             assert False
-        #  print 'move:', position, '->', p, DIR_NAMES[direction], step
+        # print 'move:', position, '->', p, DIR_NAMES[direction], step
         return p
 
 
@@ -219,17 +233,17 @@ class Compiler(object):
     """
 
     def __init__(self):
+        self.primitive = None
         self.lines = []
         self.debug = None
         self.label_map = {}
 
     def compile(self, program):
         """Compile to aheui-assembly representation."""
-        primitive = PrimitiveProgram(program)
-
-        self.lines, self.label_map, code_map = self.serialize(primitive)
+        self.primitive = PrimitiveProgram(program)
+        self.lines, self.label_map, code_map = self.serialize(self.primitive)
         self.debug = Debug(self.lines)
-        self.debug.build_comments(primitive, code_map)
+        self.debug.build_comments(self.primitive, code_map)
 
     def serialize(self, primitive):
         """Serialize Aheui primitive codes.
@@ -265,7 +279,7 @@ class Compiler(object):
                 label_map[marker] = len(lines)
             while True:
                 if position not in primitive.pane:
-                    position = primitive.advance_position(position, direction)
+                    position = primitive.advance_position(position, direction, step)
                     continue
 
                 op, mv, val = primitive.decode(position)
@@ -389,7 +403,7 @@ class Compiler(object):
                 target_idx = self.label_map[val]
                 new_target_idx = target_idx - useless_map[target_idx]
                 new_label_map[val] = new_target_idx
-                #  print 'remap:', target_idx, '->', new_target_idx
+                # print 'remap:', target_idx, '->', new_target_idx
             if self.debug:
                 comments = []
                 for comment in comments_buffer:
