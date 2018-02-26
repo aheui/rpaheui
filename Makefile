@@ -1,6 +1,7 @@
 
 RPYTHON?=../pypy/rpython/bin/rpython
 RPYTHONFLAGS?=--opt=jit
+CXXFLAGS=-std=c++14 -Wall -Os
 
 
 all: aheui-c aheui-py
@@ -30,3 +31,6 @@ testpy:
 	pytest
 	if [ -e snippets ]; then cd snippets && git pull; else git clone https://github.com/aheui/snippets; fi
 	cd snippets && AHEUI=../rpaheui.py bash test.sh
+
+test-template-cc:
+	$(CXX) $(CXXFLAGS) aheui/template.cc && ./a.out
