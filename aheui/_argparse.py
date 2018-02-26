@@ -144,7 +144,7 @@ parser.add_argument('--source', '-S', default='auto', choices='auto,bytecode,asm
 \t- `asm`: See `ahsembly`.
 \t- usage: `--source=asm`, `-Sbytecode` or `-S text`
 """)
-parser.add_argument('--target', '-T', default='run', choices='run,bytecode,asm', description='Set target filetype.', full_description="""\t- `run`: Run given code.
+parser.add_argument('--target', '-T', default='run', choices='run,bytecode,asm,c++', description='Set target filetype.', full_description="""\t- `run`: Run given code.
 \t- `bytecode`: Aheui bytecode. (Bytecode representation of `ahsembly`.
 \t- `asm`: See `ahsembly`.
 \t- usage: `--target=asm`, `-Tbytecode` or `-T run`
@@ -157,3 +157,4 @@ parser.add_argument('--cmd', '-c', default='', description='Program passed in as
 parser.add_argument('--no-c', '--no-c', narg='0', default='no', description='Do not generate `.aheuic` file automatically.', full_description='\tWhat is .aheuic? https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35\n')
 parser.add_argument('--version', '-v', narg='-1', default='no', description='Show program version', message=VERSION)
 parser.add_argument('--help', '-h', narg='-1', default='no', description='Show this help text')
+parser.add_argument('-X', '-X', default='', choices='time', description='Set debug option')

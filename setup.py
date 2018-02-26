@@ -33,7 +33,7 @@ setup(
         'aheui/int',
     ),
     package_data={
-        'aheui': ['version.py']
+        'aheui': ['version.py', 'template.cc']
     },
     install_requires=[
     ],

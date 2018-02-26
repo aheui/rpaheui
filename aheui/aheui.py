@@ -504,8 +504,10 @@ def process_opt(argv):
                 output += '.aheuis'
         elif target == 'run':
             output = '-'
+        elif target == 'c++':
+            output = filename + '.cc'
         else:
-            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "run"\n')
+            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "run" or "c++"\n')
             raise SystemExit()
 
     return cmd, source, contents, opt_level, target, aheuic_output, output
@@ -566,6 +568,11 @@ def entry_point(argv):
     elif target == 'bytecode':
         bytecode = compiler.write_bytecode()
         os.write(outfp, bytecode)
+        os.close(outfp)
+        exitcode = 0
+    elif target == 'c++':
+        c_source = compiler.write_cpp().encode('utf-8')
+        os.write(outfp, c_source)
         os.close(outfp)
         exitcode = 0
     else:

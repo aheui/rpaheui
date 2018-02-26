@@ -13,6 +13,11 @@ import os
 import aheui.const as c
 from aheui._compat import unichr, _unicode
 
+fcc = os.open('aheui/template.cc', os.O_RDONLY, 0o777)
+template_cc = os.read(fcc, 100000).decode('utf-8')  # inlining template
+os.close(fcc)
+del fcc
+
 
 OP_NAMES = [None, None, u'DIV', u'ADD', u'MUL', u'MOD', u'POP', u'PUSH', u'DUP', u'SEL', u'MOV', None, u'CMP', None, u'BRZ', None, u'SUB', u'SWAP', u'HALT', u'POPNUM', u'POPCHAR', u'PUSHNUM', u'PUSHCHAR', u'BRPOP2', u'BRPOP1', u'JMP']
 
@@ -918,3 +923,33 @@ class Compiler(object):
         for key in label_map.keys():
             self.label_map[label_map[key]] = label_name_map[key]
         self.debug = Debug(lines, comments)
+
+    def write_cpp(self):
+        """Write C code with comments."""
+        codes = []
+        for i, (op, val) in enumerate(self.lines):
+            if i in self.label_map.values():
+                label_str = u'L%s:' % _unicode(i)
+                codes.append(padding(label_str, 8))
+            else:
+                codes.append(u' ' * 8)
+            code = OP_NAMES[op].encode('utf-8').lower().decode('utf-8')  # rpython workaround
+            if op in c.OP_JUMPS:
+                slabel = _unicode(self.label_map[val])
+                if op != c.OP_JMP:
+                    code_val = u'if (r->jump_%s()) goto L%s' % (code, slabel)
+                else:
+                    code_val = u'goto L%s' % slabel
+            else:
+                if OP_USEVAL[op]:
+                    param = _unicode(val)
+                else:
+                    param = u''
+                code_val = u'r->%s(%s)' % (code, param)
+            comment = self.debug.comment(i) if self.debug else u''
+            sline = padding(_unicode(i), 3)
+            codes.append(u'%s; // L%s %s\n' % (code_val, sline, comment))
+        gen_code = u''.join(codes)
+        splited_cc = template_cc.split(u'\n')
+        splited_cc[splited_cc.index(u'///GENERATED_CODE///')] = gen_code
+        return u'\n'.join(splited_cc)
