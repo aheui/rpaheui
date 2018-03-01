@@ -3,12 +3,6 @@
 
 from __future__ import absolute_import
 
-try:
-    import settings
-    DEBUG = settings.DEBUG
-except ImportError:
-    DEBUG = False
-
 import os
 import aheui.const as c
 from aheui._compat import unichr, _unicode
@@ -75,7 +69,6 @@ def read(fp=0):
 
 
 class Debug(object):
-    ENABLED = DEBUG
 
     def __init__(self, lines, comments=None):
         self.lines = lines
@@ -238,12 +231,13 @@ class Compiler(object):
         self.debug = None
         self.label_map = {}
 
-    def compile(self, program):
+    def compile(self, program, add_debug_info=False):
         """Compile to aheui-assembly representation."""
         self.primitive = PrimitiveProgram(program)
         self.lines, self.label_map, code_map = self.serialize(self.primitive)
-        self.debug = Debug(self.lines)
-        self.debug.build_comments(self.primitive, code_map)
+        if add_debug_info:
+            self.debug = Debug(self.lines)
+            self.debug.build_comments(self.primitive, code_map)
 
     def serialize(self, primitive):
         """Serialize Aheui primitive codes.

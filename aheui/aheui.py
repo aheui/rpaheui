@@ -28,7 +28,7 @@ driver = jit.JitDriver(
     get_printable_location=get_location)
 
 
-DEBUG = False
+DEBUG = False  # debug flag for `rpaheui`
 
 
 class Link(object):
@@ -517,14 +517,14 @@ def open_w(filename):
     return os.open(filename, os.O_WRONLY | os.O_CREAT, 0o644)
 
 
-def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None):
+def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, add_debug_info=False):
     compiler = compile.Compiler()
     if source == 'bytecode':
         compiler.read_bytecode(contents)
     elif source == 'asm':
         compiler.read_asm(contents.decode('utf-8'))
     else:
-        compiler.compile(contents.decode('utf-8'))
+        compiler.compile(contents.decode('utf-8'), add_debug_info=add_debug_info)
 
     if opt_level == 0:
         pass
@@ -555,7 +555,8 @@ def entry_point(argv):
     except SystemExit:
         return 1
 
-    compiler = prepare_compiler(contents, int(str_opt_level), source, aheuic_output)
+    add_debug_info = DEBUG or target != 'run'  # debug flag for user program
+    compiler = prepare_compiler(contents, int(str_opt_level), source, aheuic_output, add_debug_info)
     outfp = 1 if output == '-' else open_w(output)
     if target == 'run':
         program = Program(compiler.lines, compiler.label_map)
