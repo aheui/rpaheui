@@ -67,8 +67,8 @@ Options
   - `run` target: This option is not availble and ignored.
   - `bytecode` target: Default value is `.aheuic`
   - `asm` target: Default value is `.aheuis`
+  - `asm+comment` target: Same as `asm` with comments.
 - --cmd,-c: Program passed in as string
-- --omit-comment: Do not generate comments while `asm` target.
 - --no-c: Do not generate `.aheuic` file automatically.
   - Why `.aheuic` is useful: [https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35](https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35)
 
