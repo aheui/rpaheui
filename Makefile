@@ -1,6 +1,6 @@
 
 RPYTHON?=../pypy/rpython/bin/rpython
-RPYTHONFLAGS?=--opt=jit
+RPYTHONFLAGS?=--opt=jit --lto
 export PYPY_DONT_RUN_SUBPROCESS=1
 
 
