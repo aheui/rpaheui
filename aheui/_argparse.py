@@ -139,9 +139,10 @@ parser.add_argument('--opt', '-O', default='2', choices='0,1,2', description='Se
 \t1: Quickly resolve deadcode by rough stacksize emulation and merge constant operations.
 \t2: Perfectly resolve deadcode by stacksize emulation, reserialize code chunks and merge constant operations.
 """)
-parser.add_argument('--source', '-S', default='auto', choices='auto,bytecode,asm,text', description='Set source filetype.', full_description="""\t- `auto`: Guess the source type. `bytecode` if `.aheuic` or `End of bytecode` pattern in source. `asm` is `.aheuis`. `text` if `.aheui`. `text` is default.
+parser.add_argument('--source', '-S', default='auto', choices='auto,bytecode,asm,asm+comment,text', description='Set source filetype.', full_description="""\t- `auto`: Guess the source type. `bytecode` if `.aheuic` or `End of bytecode` pattern in source. `asm` is `.aheuis`. `text` if `.aheui`. `text` is default.
 \t- `bytecode`: Aheui bytecode. (Bytecode representation of `ahsembly`.
 \t- `asm`: See `ahsembly`.
+\t- `asm+comment`: Same as `asm` with comments.
 \t- usage: `--source=asm`, `-Sbytecode` or `-S text`
 """)
 parser.add_argument('--target', '-T', default='run', choices='run,bytecode,asm', description='Set target filetype.', full_description="""\t- `run`: Run given code.
