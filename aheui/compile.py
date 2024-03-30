@@ -579,7 +579,7 @@ class Compiler(object):
                        b1                  b2           b3        x       b4
                     """
                     size = ix - i + 1
-                    diff = f - size
+                    diff = f - ix
                     for label, dest in self.label_map.items():
                         if i <= dest <= ix:  # b2
                             self.label_map[label] += diff - 1
