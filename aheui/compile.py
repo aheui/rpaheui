@@ -500,7 +500,7 @@ class Compiler(object):
                         break
                 if op == c.OP_BRPOP1 or op == c.OP_BRPOP2:
                     reqsize = c.OP_REQSIZE[op]
-                    if stacksize >= reqsize:
+                    if min_stacksizes[selected] >= reqsize:
                         pc += 1
                         continue
                     else:
