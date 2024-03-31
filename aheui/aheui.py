@@ -389,7 +389,10 @@ def mainloop(program, debug):
         elif op == c.OP_MOV:
             r = selected.pop()
             value = program.get_operand(pc)
-            storage[value].push(r)
+            targeted = storage[value]
+            targeted.push(r)
+            if selected == targeted:
+                stacksize += 1
         elif op == c.OP_CMP:
             selected.cmp()
         elif op == c.OP_BRPOP1 or op == c.OP_BRPOP2 or op == c.OP_JMP or op == c.OP_BRZ:
