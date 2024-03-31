@@ -123,7 +123,7 @@ class PrimitiveProgram(object):
         pc_col = 0
         max_col = 0
         for char in self.text:
-            if char == '\n':
+            if char == u'\n':
                 pc_row += 1
                 max_col = max(max_col, pc_col)
                 pc_col = 0
@@ -131,7 +131,7 @@ class PrimitiveProgram(object):
             if u'가' <= char <= u'힣':
                 self.pane[pc_row, pc_col] = char
             else:
-                self.pane[pc_row, pc_col] = '\0'  # to mark empty space
+                self.pane[pc_row, pc_col] = u'\0'  # to mark empty space
             pc_col += 1
         max_col = max(max_col, pc_col)
 
@@ -139,7 +139,7 @@ class PrimitiveProgram(object):
         self.max_col = max_col
 
     def decode(self, position):
-        code = self.pane.get(position, '\0')
+        code = self.pane.get(position, u'\0')
         if code == u'\0':
             return c.OP_NONE, MV_NONE, -1  # do nothing
         base = ord(code) - ord(u'가')
@@ -848,6 +848,7 @@ class Compiler(object):
             else:
                 codes.append(u' ' * 8)
             code = OP_NAMES[op]
+            assert code is not None
             if len(code.encode('utf-8')) == 3:
                 code += u' '
             if code is None:

@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@master
         with:
           repository: pypy/pypy
-          ref: release-pypy2.7-v7.0.0
+          ref: release-pypy2.7-v7.3.13
       - name: Build
         run: |
           RPYTHON=pypy/pypy/rpython/bin/rpython make

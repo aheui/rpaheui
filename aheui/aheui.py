@@ -19,8 +19,9 @@ def get_location(pc, stackok, is_queue, program):
     """
     op = program.get_op(pc)
     val = ('_%d' % program.get_operand(pc)) if compile.OP_USEVAL[op] else ''
-    op_name = compile.OP_NAMES[op].encode('utf-8')
-    return "#%d(s%dq%d)_%s%s" % (pc, stackok, is_queue, op_name, val)
+    op_name = compile.OP_NAMES[op]
+    assert op_name is not None
+    return "#%d(s%dq%d)_%s%s" % (pc, stackok, is_queue, op_name.encode('utf-8'), val)
 
 
 driver = jit.JitDriver(
