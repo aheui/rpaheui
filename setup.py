@@ -17,7 +17,7 @@ def get_readme():
 
 
 tests_require = [
-    'flake8', 'tox', 'pytest>=3.0.1',
+    'ruff', 'tox', 'pytest>=3.0.1',
 ]
 
 setup(

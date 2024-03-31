@@ -1,5 +1,5 @@
-
 # coding: utf-8
+# flake8: noqa: E501
 
 OP_REQSIZE = [0, 0, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 2, 0, 1, 1, 0, 0, 2, 1, 0]
 OP_STACKDEL = [0, 0, 2, 2, 2, 2, 1, 0, 1, 0, 1, 0, 2, 0, 1, 0, 2, 2, 0, 1, 1, 0, 0, 0, 0, 0]
@@ -16,18 +16,18 @@ OP_ADD = 3  # ㄷ
 OP_MUL = 4  # ㄸ
 OP_MOD = 5  # ㄹ
 OP_POP = 6  # ㅁ
-OP_PUSH= 7  # ㅂ
+OP_PUSH = 7  # ㅂ
 OP_DUP = 8  # ㅃ
 OP_SEL = 9  # ㅅ
 OP_MOV = 10  # ㅆ
-OP_NONE= 11  # ㅇ
+OP_NONE = 11  # ㅇ
 OP_CMP = 12  # ㅈ
 # ㅉ
 OP_BRZ = 14
 # ㅋ
 OP_SUB = 16  # ㅌ
-OP_SWAP= 17  # ㅍ
-OP_HALT= 18  # ㅎ
+OP_SWAP = 17  # ㅍ
+OP_HALT = 18  # ㅎ
 
 # end of primitive
 OP_POPNUM = 19

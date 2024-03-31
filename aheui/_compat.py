@@ -46,7 +46,7 @@ except NameError:
     ord3 = ord
 
     def ord(n):
-        if type(n) == int:
+        if type(n) == int:  # noqa: E721
             return n
         return ord3(n)
 
