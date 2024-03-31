@@ -11,12 +11,11 @@ on:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.12"]
+        python-version: ["3.12"]
 
     steps:
     - uses: actions/checkout@v2
@@ -33,11 +32,32 @@ jobs:
     - name: Lint with Ruff
       run: |
         ruff check .
-    - name: Test with snippets
+    - name: Test with pytest
       run: |
         pytest
-    - name: Test with pytest
+    - name: Test with snippets
       run: |
         cd snippets && AHEUI=../rpaheui.py ./test.sh --disable logo
     - name: Codecov
       run: bash <(curl -s https://codecov.io/bash)
+  build-jit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+          submodules: true
+      - name: Set up PyPy
+        uses: actions/setup-python@v2
+        with:
+          python-version: pypy-2.7
+      - uses: actions/checkout@master
+        with:
+          repository: pypy/pypy
+          ref: release-pypy2.7-v7.3.13
+      - name: Build
+        run: |
+          RPYTHON=pypy/pypy/rpython/bin/rpython make
+      - name: Test with snippets
+        run: |
+          cd snippets && AHEUI=../rpaheui-c ./test.sh --disable logo integer
