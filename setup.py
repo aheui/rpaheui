@@ -25,6 +25,7 @@ setup(
     version=get_version(),
     description='Aheui compiler & assembler toolkit.',
     long_description=get_readme(),
+    long_description_content_type='text/markdown',
     author='Jeong YunWon',
     author_email='aheui@youknowone.org',
     url='https://github.com/aheui/rpaheui',
