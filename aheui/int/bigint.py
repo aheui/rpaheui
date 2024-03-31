@@ -3,6 +3,9 @@ from rpython.rlib.jit import elidable
 from rpython.rlib.rbigint import rbigint
 
 
+Int = rbigint
+
+
 def fromstr(s):
     return rbigint.fromstr(s)
 

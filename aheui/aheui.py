@@ -104,7 +104,7 @@ class Stack(LinkedList):
         self.size = 0
 
     def push(self, value):
-        # assert(isinstance(value, int))
+        # assert(isinstance(value, bigint.Int))
         node = Link(self.head, value)
         self.head = node
         self.size += 1
@@ -129,6 +129,7 @@ class Queue(LinkedList):
         self.size = 0
 
     def push(self, value):
+        # assert(isinstance(value, bigint.Int))
         tail = self.tail
         tail.value = value
         new = Link(None)
@@ -154,10 +155,10 @@ class Port(LinkedList):
     def __init__(self):
         self.head = None
         self.size = 0
-        self.last_push = 0
+        self.last_push = bigint.fromint(0)
 
     def push(self, value):
-        # assert(isinstance(value, int))
+        # assert(isinstance(value, bigint.Int))
         node = Link(self.head, value)
         self.head = node
         self.size += 1

@@ -1,3 +1,5 @@
+Int = int
+
 
 def fromstr(s):
     return int(s)
