@@ -1,3 +1,4 @@
+# flake8: noqa: E501
 
 from __future__ import absolute_import
 
@@ -113,7 +114,7 @@ class ArgumentParser(object):
         import os
         try:
             return self._parse_args(args)
-        except HelpException as e:
+        except HelpException:
             os.write(2, 'usage: %s [option] ... file\n\n' % self.kwargs.get('prog', args[0]))
             for names, opt in self.arguments:
                 name = names[0] if names[0] == names[1] else ('%s,%s' % names[0:2])

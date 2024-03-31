@@ -51,9 +51,9 @@ DIR_UP = -1
 DIR_LEFT = -2
 
 
-def padding(s, l, left=True):
-    spaces = u' ' * max(0, l - len(s))
-    padded = (s + spaces) if left else (spaces + s)
+def padding(content, max_length, left=True):
+    spaces = u' ' * max(0, max_length - len(content))
+    padded = (content + spaces) if left else (spaces + content)
     return padded
 
 
@@ -592,7 +592,9 @@ class Compiler(object):
                     b3 = lines[ix + 1:f]
                     b4 = lines[f + 1:]
                     lines = b1 + b3 + b2 + b4
-                    hints = hints[:i] + hints[ix + 1:f] + hints[i:ix + 1] + hints[f + 1:]
+                    hints = (
+                        hints[:i] + hints[ix + 1:f] + hints[i:ix + 1] + hints[f + 1:]
+                    )
                 else:
                     """
                     ... | JMP->i(f) | ... JMP(i-1) | XXX(i) ... JMP(ix) | ...
@@ -612,7 +614,9 @@ class Compiler(object):
                     b3 = lines[i:ix + 1]
                     b4 = lines[ix + 1:]
                     lines = b1 + b3 + b2 + b4
-                    hints = hints[:f] + hints[i:ix + 1] + hints[f + 1:i] + hints[ix + 1:]
+                    hints = (
+                        hints[:f] + hints[i:ix + 1] + hints[f + 1:i] + hints[ix + 1:]
+                    )
                 break
             else:
                 break
@@ -798,7 +802,10 @@ class Compiler(object):
             if op in c.OP_JUMPS:
                 val = self.label_map[val]
             if val >= 0:
-                p_val = chr(val & 0xff) + chr((val & 0xff00) >> 8) + chr((val & 0xff0000) >> 16)
+                char1 = chr(val & 0xff)
+                char2 = chr((val & 0xff00) >> 8)
+                char3 = chr((val & 0xff0000) >> 16)
+                p_val = char1 + char2 + char3
             else:
                 p_val = '\0\0\0'
             if op < 0:
@@ -908,7 +915,8 @@ class Compiler(object):
                     lines.append((opcode, -1))
                 comments.append([comment])
             except Exception:
-                os.write(2, b'parsing error: ln%d %s\n' % (len(lines), main.encode('utf-8')))
+                msg = b'parsing error: ln%d %s\n' % (len(lines), main.encode('utf-8'))
+                os.write(2, msg)
                 raise
         self.lines = lines
         self.label_map = {}

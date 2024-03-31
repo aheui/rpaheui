@@ -19,7 +19,8 @@ def get_location(pc, stackok, is_queue, program):
     """
     op = program.get_op(pc)
     val = ('_%d' % program.get_operand(pc)) if compile.OP_USEVAL[op] else ''
-    return "#%d(s%dq%d)_%s%s" % (pc, stackok, is_queue, compile.OP_NAMES[op].encode('utf-8'), val)
+    op_name = compile.OP_NAMES[op].encode('utf-8')
+    return "#%d(s%dq%d)_%s%s" % (pc, stackok, is_queue, op_name, val)
 
 
 driver = jit.JitDriver(
@@ -241,8 +242,9 @@ def read_utf8(input_buffer=input_buffer):
             buf = input_buffer.take(length)
             if len(buf) == length:
                 try:
-                    v = ord((buf).decode('utf-8')[0])
-                except:
+                    decoded = buf.decode('utf-8')
+                    v = ord(decoded[0])
+                except UnicodeDecodeError:
                     v = -1
             else:
                 v = -1
@@ -286,7 +288,8 @@ def write_number(value):
 @jit.dont_look_inside
 def write_utf8(value):
     if not (0 <= value < 0x110000):
-        os.write(errfp, b'[Warning] Undefined behavior: unicode %x out of range\n' % value)
+        msg = b'[Warning] Undefined behavior: unicode %x out of range\n' % value
+        os.write(errfp, msg)
         value = 0xfffd
     os.write(outfp, unichr(value).encode('utf-8'))
 
@@ -295,8 +298,8 @@ class Program(object):
     _immutable_fields_ = ['labels[**]', 'opcodes[*]', 'values[*]', 'size']
 
     def __init__(self, lines, label_map):
-        self.opcodes = [l[0] for l in lines]
-        self.values = [l[1] for l in lines]
+        self.opcodes = [line[0] for line in lines]
+        self.values = [line[1] for line in lines]
         self.size = len(lines)
         self.labels = label_map
 
@@ -507,7 +510,7 @@ def process_opt(argv):
         elif target == 'run':
             output = '-'
         else:
-            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "asm+comment", "run"\n')
+            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "asm+comment", "run"\n')  # noqa: E501
             raise SystemExit()
 
     return cmd, source, contents, opt_level, target, aheuic_output, comment_aheuis, output
@@ -544,7 +547,7 @@ def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, a
             os.write(bfp, '\n\n')
             os.write(bfp, asm)
             os.close(bfp)
-        except:
+        except Exception:
             pass
     return compiler
 
