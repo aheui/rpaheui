@@ -54,10 +54,14 @@ jobs:
       - uses: actions/checkout@master
         with:
           repository: pypy/pypy
-          ref: release-pypy2.7-v7.3.13
+          ref: release-pypy2.7-v7.3.9
+          path: pypy
       - name: Build
         run: |
-          RPYTHON=pypy/pypy/rpython/bin/rpython make
+          export RPYTHON="pypy $GITHUB_WORKSPACE/pypy/rpython/bin/rpython"
+          cd $GITHUB_WORKSPACE
+          make
       - name: Test with snippets
         run: |
-          cd snippets && AHEUI=../rpaheui-c ./test.sh --disable logo integer
+          cd "$GITHUB_WORKSPACE/snippets"
+          AHEUI="$GITHUB_WORKSPACE/rpaheui-c" ./test.sh --disable logo integer
