@@ -23,7 +23,7 @@
 
 ```
 git clone https://github.com/aheui/rpaheui
-make # set RPYTHON in Makefile. You can get pypy by: hg clone http://bitbucket.org/pypy/pypy
+make # RPYTHON 환경변수 설정 필요. rpython은 pypy 소스코드를 내려받으면 포함되어 있습니다. 버전은 github actions 설정을 참고해 주세요.
 ./aheui-c <your-aheui-code>
 ```
 
