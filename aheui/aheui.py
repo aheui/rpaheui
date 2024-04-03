@@ -7,9 +7,9 @@ import os
 
 from aheui import const as c
 from aheui._compat import jit, unichr, ord, _unicode
-from aheui import _argparse
 from aheui import compile
 from aheui.int import smallint as bigint  # import `bigint` to enable bigint
+from aheui.option import process_options
 from aheui.warning import WarningPool
 
 
@@ -329,7 +329,6 @@ warnings = WarningPool()
 
 
 def mainloop(program, debug):
-    jit.set_param(driver, 'trace_limit', 30000)
     program = jit.promote(program)
     jit.assert_green(program)
     pc = 0
@@ -441,89 +440,6 @@ def mainloop(program, debug):
         return 0
 
 
-def process_opt(argv):
-    def open_r(filename):
-        return os.open(filename, os.O_RDONLY, 0o777)
-
-    parser = _argparse.parser
-    kwargs, args = parser.parse_args(argv)
-    if not args:
-        raise SystemExit()
-
-    cmd = kwargs['cmd']
-    if cmd == '':
-        if len(args) != 2:
-            os.write(2, b'aheui: error: no input files\n')
-            raise SystemExit()
-        filename = args[1]
-        if filename == '-':
-            fp = 0
-            contents = compile.read(fp)
-        else:
-            fp = open_r(filename)
-            contents = compile.read(fp)
-            os.close(fp)
-    else:
-        if len(args) != 1:
-            os.write(2, b'aheui: error: --cmd,-c but input file found\n')
-            raise SystemExit()
-        contents = cmd
-        filename = '-'
-
-    source = kwargs['source']
-    if source == 'auto':
-        if filename.endswith('.aheui'):
-            source = 'text'
-        elif filename.endswith('.aheuic'):
-            source = 'bytecode'
-        elif filename.endswith('.aheuis'):
-            source = 'asm'
-        elif '\xff\xff\xff\xff' in contents:
-            source = 'bytecode'
-        else:
-            source = 'text'
-
-    opt_level = kwargs['opt']
-
-    target = kwargs['target']
-    need_aheuic = target == 'run' and kwargs['no-c'] == 'no'\
-        and filename != '-' and not filename.endswith('.aheuic')
-
-    if need_aheuic:
-        aheuic_output = filename
-        if aheuic_output.endswith('.aheui'):
-            aheuic_output += 'c'
-        else:
-            aheuic_output += '.aheuic'
-    else:
-        aheuic_output = None
-
-    output = kwargs['output']
-    comment_aheuis = False
-    if output == '':
-        if target == 'bytecode':
-            output = filename
-            if output.endswith('.aheui'):
-                output += 'c'
-            else:
-                output += '.aheuic'
-        elif target in ['asm', 'asm+comment']:
-            output = filename
-            if output.endswith('.aheui'):
-                output += 's'
-            else:
-                output += '.aheuis'
-            comment_aheuis = target == 'asm+comment'
-        elif target == 'run':
-            output = '-'
-        else:
-            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "asm+comment", "run"\n')  # noqa: E501
-            raise SystemExit()
-
-    warning_limit = int(kwargs['warning-limit'])
-
-    return cmd, source, contents, opt_level, target, aheuic_output, comment_aheuis, output, warning_limit
-
 
 def open_w(filename):
     return os.open(filename, os.O_WRONLY | os.O_CREAT, 0o644)
@@ -563,10 +479,13 @@ def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, a
 
 def entry_point(argv):
     try:
-        cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output, warning_limit = process_opt(argv)
+        cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output, warning_limit, trace_limit = process_options(argv, os.environ)
     except SystemExit:
         return 1
+    
     warnings.limit = warning_limit
+    if trace_limit >= 0:
+        jit.set_param(driver, 'trace_limit', trace_limit)
 
     add_debug_info = DEBUG or target != 'run'  # debug flag for user program
     compiler = prepare_compiler(contents, int(str_opt_level), source, aheuic_output, add_debug_info)
