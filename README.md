@@ -1,7 +1,7 @@
 알파희 - 알파희썬(rpython)으로 만든 엔터프라이즈급 고성능 아희
 ====
 
-[![Build Status](https://travis-ci.org/aheui/rpaheui.svg?branch=master)](https://travis-ci.org/aheui/rpaheui)
+[![Build Status](https://github.com/aheui/rpaheui/workflows/CI/badge.svg)](https://github.com/aheui/rpaheui/actions?query=workflow%3ACI)
 
 * English: [README.en.md](https://github.com/aheui/rpaheui/blob/master/README.en.md)
 * Working log (English): [LOG.md](https://github.com/aheui/rpaheui/blob/master/LOG.md)
@@ -23,7 +23,7 @@
 
 ```
 git clone https://github.com/aheui/rpaheui
-make # set RPYTHON in Makefile. You can get pypy by: hg clone http://bitbucket.org/pypy/pypy
+make # RPYTHON 환경변수 설정 필요. rpython은 pypy 소스코드를 내려받으면 포함되어 있습니다. 버전은 github actions 설정을 참고해 주세요.
 ./aheui-c <your-aheui-code>
 ```
 
