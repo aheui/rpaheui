@@ -2,8 +2,6 @@
 
 from __future__ import absolute_import
 
-from aheui.version import VERSION
-
 
 class ParserError(Exception):
     __description__ = ''
@@ -133,30 +131,3 @@ class ArgumentParser(object):
             prog = self.kwargs.get('prog', args[0])
             os.write(2, '%s: error: %s\n' % (prog, e.message()))
         return {}, []
-
-
-parser = ArgumentParser(prog='aheui')
-parser.add_argument('--opt', '-O', default='2', choices='0,1,2', description='Set optimization level.', full_description="""\t0: No optimization.
-\t1: Quickly resolve deadcode by rough stacksize emulation and merge constant operations.
-\t2: Perfectly resolve deadcode by stacksize emulation, reserialize code chunks and merge constant operations.
-""")
-parser.add_argument('--source', '-S', default='auto', choices='auto,bytecode,asm,asm+comment,text', description='Set source filetype.', full_description="""\t- `auto`: Guess the source type. `bytecode` if `.aheuic` or `End of bytecode` pattern in source. `asm` is `.aheuis`. `text` if `.aheui`. `text` is default.
-\t- `bytecode`: Aheui bytecode. (Bytecode representation of `ahsembly`.
-\t- `asm`: See `ahsembly`.
-\t- `asm+comment`: Same as `asm` with comments.
-\t- usage: `--source=asm`, `-Sbytecode` or `-S text`
-""")
-parser.add_argument('--target', '-T', default='run', choices='run,bytecode,asm', description='Set target filetype.', full_description="""\t- `run`: Run given code.
-\t- `bytecode`: Aheui bytecode. (Bytecode representation of `ahsembly`.
-\t- `asm`: See `ahsembly`.
-\t- usage: `--target=asm`, `-Tbytecode` or `-T run`
-""")
-parser.add_argument('--output', '-o', default='', description='Output file. Default is ``. See details for each target. If the value is `-`, it is standard output.', full_description="""\t- `run` target: This option is not availble and ignored.
-\t- `bytecode` target: Default value is `.aheuic`
-\t- `asm` target: Default value is `.aheuis`
-""")
-parser.add_argument('--cmd', '-c', default='', description='Program passed in as string')
-parser.add_argument('--no-c', '--no-c', narg='0', default='no', description='Do not generate `.aheuic` file automatically.', full_description='\tWhat is .aheuic? https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35\n')
-parser.add_argument('--warning-limit', '--warning-limit', default='3', description='Set repetitive warning limit. 0 means no warning. -1 means no limit.')
-parser.add_argument('--version', '-v', narg='-1', default='no', description='Show program version', message=VERSION)
-parser.add_argument('--help', '-h', narg='-1', default='no', description='Show this help text')
