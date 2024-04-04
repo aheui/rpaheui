@@ -10,6 +10,7 @@ from aheui._compat import jit, unichr, ord, _unicode
 from aheui import _argparse
 from aheui import compile
 from aheui.int import smallint as bigint  # import `bigint` to enable bigint
+from aheui.warning import WarningPool
 
 
 def get_location(pc, stackok, is_queue, program):
@@ -288,10 +289,9 @@ def write_number(value):
 
 
 @jit.dont_look_inside
-def write_utf8(value):
+def write_utf8(warnings, value):
     if not (0 <= value < 0x110000):
-        msg = b'[Warning] Undefined behavior: unicode %x out of range\n' % value
-        os.write(errfp, msg)
+        warnings.warn(b'write-utf8-range', value)
         value = 0xfffd
     os.write(outfp, unichr(value).encode('utf-8'))
 
@@ -324,6 +324,7 @@ class Program(object):
 
 outfp = 1
 errfp = 2
+warnings = WarningPool()
 
 
 def mainloop(program, debug):
@@ -417,7 +418,7 @@ def mainloop(program, debug):
             write_number(r)
         elif op == c.OP_POPCHAR:
             r = selected.pop_longlong()
-            write_utf8(r)
+            write_utf8(warnings, r)
         elif op == c.OP_PUSHNUM:
             num = read_number()
             selected.push(num)
@@ -518,7 +519,9 @@ def process_opt(argv):
             os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "asm+comment", "run"\n')  # noqa: E501
             raise SystemExit()
 
-    return cmd, source, contents, opt_level, target, aheuic_output, comment_aheuis, output
+    warning_limit = int(kwargs['warning-limit'])
+
+    return cmd, source, contents, opt_level, target, aheuic_output, comment_aheuis, output, warning_limit
 
 
 def open_w(filename):
@@ -559,9 +562,10 @@ def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, a
 
 def entry_point(argv):
     try:
-        cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output = process_opt(argv)
+        cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output, warning_limit = process_opt(argv)
     except SystemExit:
         return 1
+    warnings.limit = warning_limit
 
     add_debug_info = DEBUG or target != 'run'  # debug flag for user program
     compiler = prepare_compiler(contents, int(str_opt_level), source, aheuic_output, add_debug_info)
