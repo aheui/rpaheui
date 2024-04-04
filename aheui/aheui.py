@@ -31,12 +31,13 @@ driver = jit.JitDriver(
 
 
 DEBUG = False  # debug flag for `rpaheui`
+MINUS1 = bigint.fromlong(-1)
 
 
 class Link(object):
     """Element unit for stack and queue."""
 
-    def __init__(self, next, value=bigint.fromlong(-1)):
+    def __init__(self, next, value=MINUS1):
         self.value = value
         self.next = next
 
