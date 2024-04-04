@@ -26,6 +26,10 @@ def tolonglong(big):
     return big.tolonglong()
 
 
+def str(big):
+    return big.str()
+
+
 @jit.elidable
 def add(r1, r2):
     return r1.add(r2)

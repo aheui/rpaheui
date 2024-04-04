@@ -6,9 +6,8 @@ from __future__ import absolute_import
 import os
 
 from aheui import const as c
-from aheui._compat import jit, unichr, ord, _unicode
+from aheui._compat import jit, unichr, ord, _unicode, bigint
 from aheui import compile
-from aheui.int import smallint as bigint  # import `bigint` to enable bigint
 from aheui.option import process_options
 from aheui.warning import WarningPool
 
@@ -286,7 +285,7 @@ def read_number(input_buffer=input_buffer):
 
 @jit.dont_look_inside
 def write_number(value):
-    os.write(outfp, _unicode(value).encode('utf-8'))
+    os.write(outfp, value)
 
 
 @jit.dont_look_inside
@@ -415,8 +414,8 @@ def mainloop(program, debug):
                     stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == c.OP_POPNUM:
-            r = selected.pop_longlong()
-            write_number(r)
+            r = selected.pop()
+            write_number(bigint.str(r))
         elif op == c.OP_POPCHAR:
             r = selected.pop_longlong()
             write_utf8(warnings, r)

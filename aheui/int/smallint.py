@@ -1,7 +1,10 @@
+from __future__ import absolute_import
+
 try:
     import builtins
-except ImportError:
+except ImportError:  # python2
     builtins = __builtins__
+from aheui._compat import _bytestr
 
 
 Int = int
@@ -25,6 +28,10 @@ def toint(v):
 
 def tolonglong(v):
     return v
+
+
+def str(r):
+    return _bytestr(r)
 
 
 def add(r1, r2):
