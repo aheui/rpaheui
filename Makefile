@@ -1,6 +1,6 @@
 
 RPYTHON?=../pypy/rpython/bin/rpython
-RPYTHONFLAGS?=--opt=jit
+RPYTHONFLAGS?=--opt=jit --translation-jit_opencoder_model=big
 
 
 all: aheui-c aheui-py
