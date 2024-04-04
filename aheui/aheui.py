@@ -283,18 +283,26 @@ def read_number(input_buffer=input_buffer):
     return num
 
 
-@jit.dont_look_inside
-def write_number(value):
-    os.write(outfp, value)
+def write_number(value_str):
+    os.write(outfp, value_str)
 
 
-@jit.dont_look_inside
 def write_utf8(warnings, value):
-    if not (0 <= value < 0x110000):
-        warnings.warn(b'write-utf8-range', value)
-        value = 0xfffd
-    os.write(outfp, unichr(value).encode('utf-8'))
+    REPLACE_CHAR = unichr(0xfffd).encode('utf-8')
 
+    if bigint.is_unicodepoint(value):
+        codepoint = bigint.toint(value)
+        unicode_char = unichr(codepoint)
+        bytes = unicode_char.encode('utf-8')
+    else:
+        bytes = REPLACE_CHAR
+
+    os.write(outfp, bytes)
+
+
+def warn_utf8_range(warnings, value):
+    warnings.warn(b'write-utf8-range', value)
+    os.write(outfp, unichr(0xfffd).encode('utf-8'))
 
 class Program(object):
     _immutable_fields_ = ['labels[**]', 'opcodes[*]', 'values[*]', 'size']
@@ -417,7 +425,7 @@ def mainloop(program, debug):
             r = selected.pop()
             write_number(bigint.str(r))
         elif op == c.OP_POPCHAR:
-            r = selected.pop_longlong()
+            r = selected.pop()
             write_utf8(warnings, r)
         elif op == c.OP_PUSHNUM:
             num = read_number()

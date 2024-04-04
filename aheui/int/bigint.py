@@ -67,3 +67,8 @@ def ge(r1, r2):
 def is_zero(r):
     # return r.sign == 0
     return r._size == 0  # pypy 7.3.15
+
+
+@jit.elidable
+def is_unicodepoint(r):
+    return 0 <= r._size and r.int_le(0x110000)
