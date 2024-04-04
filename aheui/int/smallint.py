@@ -1,3 +1,9 @@
+try:
+    import builtins
+except ImportError:
+    builtins = __builtins__
+
+
 Int = int
 
 
@@ -43,3 +49,7 @@ def mod(r1, r2):
 
 def ge(r1, r2):
     return r1 >= r2
+
+
+def is_zero(r):
+    return r == 0

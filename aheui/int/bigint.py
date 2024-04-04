@@ -54,3 +54,8 @@ def mod(r1, r2):
 @jit.elidable
 def ge(r1, r2):
     return r1.ge(r2)
+
+
+@jit.elidable
+def is_zero(r):
+    return r.sign == 0

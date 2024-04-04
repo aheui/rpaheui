@@ -402,7 +402,8 @@ def mainloop(program, debug):
             elif op == c.OP_JMP:
                 jump = True
             elif op == c.OP_BRZ:
-                jump = 0 == selected.pop_longlong()
+                top = selected.pop()
+                jump = bigint.is_zero(top)
             else:
                 assert False
             if jump:
