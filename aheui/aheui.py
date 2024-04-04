@@ -32,12 +32,13 @@ driver = jit.JitDriver(
 
 
 DEBUG = False  # debug flag for `rpaheui`
+MINUS1 = bigint.fromlong(-1)
 
 
 class Link(object):
     """Element unit for stack and queue."""
 
-    def __init__(self, next, value=bigint.fromlong(-1)):
+    def __init__(self, next, value=MINUS1):
         self.value = value
         self.next = next
 
@@ -220,10 +221,10 @@ input_buffer = InputBuffer()
 def read_utf8(input_buffer=input_buffer):
     """Get a utf-8 character from standard input.
 
-    The length of utf-8 character is detectable in first byte.
-    If decode fails, it means it is a broken character.
-    Non-utf-8 character input is undefined in aheui.
-    Let's put -1 in this implementaion.
+    The length of a UTF-8 character can be detected in the first byte.
+    If decoding fails, it indicates that the character is broken.
+    In Aheui, non-UTF-8 character input is undefined.
+    In this implementation, let's assign -1.
     """
     input_buffer.load(1)
     head = input_buffer.look(1)
