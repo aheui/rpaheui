@@ -7,6 +7,9 @@ except ImportError:  # python2
 from aheui._compat import _bytestr
 
 
+NAME = 'smallint'
+
+
 Int = int
 
 

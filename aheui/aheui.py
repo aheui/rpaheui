@@ -440,7 +440,6 @@ def mainloop(program, debug):
         return 0
 
 
-
 def open_w(filename):
     return os.open(filename, os.O_WRONLY | os.O_CREAT, 0o644)
 
@@ -482,7 +481,7 @@ def entry_point(argv):
         cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output, warning_limit, trace_limit = process_options(argv, os.environ)
     except SystemExit:
         return 1
-    
+
     warnings.limit = warning_limit
     if trace_limit >= 0:
         jit.set_param(driver, 'trace_limit', trace_limit)

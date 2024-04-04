@@ -4,6 +4,7 @@ from __future__ import absolute_import
 
 import os
 from aheui._argparse import ArgumentParser
+from aheui._compat import bigint
 from aheui.version import VERSION
 from aheui import compile
 
@@ -32,9 +33,8 @@ parser.add_argument('--cmd', '-c', default='', description='Program passed in as
 parser.add_argument('--no-c', '--no-c', narg='0', default='no', description='Do not generate `.aheuic` file automatically.', full_description='\tWhat is .aheuic? https://github.com/aheui/snippets/commit/cbb5a12e7cd2db771538ab28dfbc9ad1ada86f35\n')
 parser.add_argument('--warning-limit', '--warning-limit', default='', description='Set repetitive warning limit. '' fallbacks to environment variable `RPAHEUI_WARNING_LIMIT`. 0 means no warning. -1 means no limit. Default is 3.')
 parser.add_argument('--trace-limit', '--trace-limit', default='', description='Set JIT trace limit. '' fallbacks to environment variable `RPAHEUI_TRACE_LIMIT`.')
-parser.add_argument('--version', '-v', narg='-1', default='no', description='Show program version', message=VERSION)
+parser.add_argument('--version', '-v', narg='-1', default='no', description='Show program version', message=('%s %s' % (VERSION, bigint.NAME)).encode('utf-8'))
 parser.add_argument('--help', '-h', narg='-1', default='no', description='Show this help text')
-
 
 
 def kwarg_or_environ(kwargs, environ, arg_key, env_key):

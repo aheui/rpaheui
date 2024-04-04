@@ -60,8 +60,9 @@ jobs:
         run: |
           export RPYTHON="pypy $GITHUB_WORKSPACE/pypy/rpython/bin/rpython"
           cd $GITHUB_WORKSPACE
-          make
+          make -j 3
       - name: Test with snippets
         run: |
           cd "$GITHUB_WORKSPACE/snippets"
-          AHEUI="$GITHUB_WORKSPACE/rpaheui-c" ./test.sh --disable logo integer
+          AHEUI="$GITHUB_WORKSPACE/rpaheui-c" ./test.sh  --disable integer
+          AHEUI="$GITHUB_WORKSPACE/rpaheui-bigint-c" ./test.sh

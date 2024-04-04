@@ -3,6 +3,9 @@ from aheui._compat import jit
 from rpython.rlib.rbigint import rbigint
 
 
+NAME = 'bigint'
+
+
 Int = rbigint
 
 
@@ -62,4 +65,5 @@ def ge(r1, r2):
 
 @jit.elidable
 def is_zero(r):
-    return r.sign == 0
+    # return r.sign == 0
+    return r._size == 0  # pypy 7.3.15

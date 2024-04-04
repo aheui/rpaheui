@@ -11,7 +11,7 @@ class Warning(object):
 
     def format(self, *args):
         return self.message % args
-    
+
 
 WARNING_LIST = [
     Warning(b'write-utf8-range', b'[Warning:UndefinedBehavior:write-utf8-range] value %x is out of unicode codepoint range.'),
