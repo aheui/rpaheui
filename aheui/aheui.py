@@ -454,7 +454,8 @@ def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, a
     elif source == 'asm':
         compiler.read_asm(contents.decode('utf-8'))
     else:
-        compiler.compile(contents.decode('utf-8'), add_debug_info=add_debug_info)
+        contents = contents.decode('utf-8')
+        compiler.compile(contents, add_debug_info=add_debug_info)
 
     if opt_level == 0:
         pass

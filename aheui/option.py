@@ -4,7 +4,7 @@ from __future__ import absolute_import
 
 import os
 from aheui._argparse import ArgumentParser
-from aheui._compat import bigint
+from aheui._compat import bigint, PY3
 from aheui.version import VERSION
 from aheui import compile
 
@@ -89,6 +89,8 @@ def process_options(argv, environ):
         if len(args) != 1:
             os.write(2, b'aheui: error: --cmd,-c but input file found\n')
             raise SystemExit()
+        if PY3:
+            cmd = cmd.encode('utf-8')
         contents = cmd
         filename = '-'
 
@@ -100,7 +102,7 @@ def process_options(argv, environ):
             source = 'bytecode'
         elif filename.endswith('.aheuis'):
             source = 'asm'
-        elif '\xff\xff\xff\xff' in contents:
+        elif b'\xff\xff\xff\xff' in contents:
             source = 'bytecode'
         else:
             source = 'text'
