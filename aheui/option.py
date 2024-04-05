@@ -10,7 +10,7 @@ from aheui import compile
 
 
 parser = ArgumentParser(prog='aheui')
-parser.add_argument('--opt', '-O', default='2', choices='0,1,2', description='Set optimization level.', full_description="""\t0: No optimization.
+parser.add_argument('--opt', '-O', default='1', choices='0,1,2', description='Set optimization level.', full_description="""\t0: No optimization.
 \t1: Quickly resolve deadcode by rough stacksize emulation and merge constant operations.
 \t2: Perfectly resolve deadcode by stacksize emulation, reserialize code chunks and merge constant operations.
 """)
