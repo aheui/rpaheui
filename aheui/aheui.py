@@ -6,7 +6,7 @@ from __future__ import absolute_import
 import os
 
 from aheui import const as c
-from aheui._compat import jit, unichr, ord, _unicode, bigint
+from aheui._compat import jit, unichr, ord, _unicode, bigint, PYR
 from aheui import compile
 from aheui.option import process_options
 from aheui.warning import WarningPool
@@ -493,6 +493,8 @@ def entry_point(argv):
     compiler = prepare_compiler(contents, int(str_opt_level), source, aheuic_output, add_debug_info)
     outfp = 1 if output == '-' else open_w(output)
     if target == 'run':
+        if not PYR:
+            warnings.warn(b'no-rpython')
         program = Program(compiler.lines, compiler.label_map)
         exitcode = mainloop(program, compiler.debug)
     elif target in ['asm', 'asm+comment']:

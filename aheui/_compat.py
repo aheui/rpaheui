@@ -51,9 +51,6 @@ except ImportError:
         def sort(self):
             self.list.sort()
 
-    import os
-    os.write(2, b"[Warning] It is running without rlib/jit.\n")
-
 
 try:
     unichr(0)
