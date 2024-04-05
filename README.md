@@ -24,7 +24,8 @@
 ```
 git clone https://github.com/aheui/rpaheui
 make # RPYTHON 환경변수 설정 필요. rpython은 pypy 소스코드를 내려받으면 포함되어 있습니다. 버전은 github actions 설정을 참고해 주세요.
-./aheui-c <your-aheui-code>
+./bin/aheui-c <아희 코드 파일>
+./bin/aheui-bigint-c <큰 정수가 필요한 아희 코드 파일>
 ```
 
 JIT로 속도 올리기

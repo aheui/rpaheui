@@ -6,9 +6,8 @@ from __future__ import absolute_import
 import os
 
 from aheui import const as c
-from aheui._compat import jit, unichr, ord, _unicode
+from aheui._compat import jit, unichr, ord, _unicode, bigint
 from aheui import compile
-from aheui.int import smallint as bigint  # import `bigint` to enable bigint
 from aheui.option import process_options
 from aheui.warning import WarningPool
 
@@ -61,11 +60,6 @@ class LinkedList(object):
         node1 = self.head
         node2 = node1.next
         node1.value, node2.value = node2.value, node1.value
-
-    def pop_longlong(self):
-        big_r = self.pop()
-        r = bigint.tolonglong(big_r)
-        return r
 
     def add(self):
         r1, r2 = self._get_2_values()
@@ -284,18 +278,26 @@ def read_number(input_buffer=input_buffer):
     return num
 
 
-@jit.dont_look_inside
-def write_number(value):
-    os.write(outfp, _unicode(value).encode('utf-8'))
+def write_number(value_str):
+    os.write(outfp, value_str)
 
 
-@jit.dont_look_inside
 def write_utf8(warnings, value):
-    if not (0 <= value < 0x110000):
-        warnings.warn(b'write-utf8-range', value)
-        value = 0xfffd
-    os.write(outfp, unichr(value).encode('utf-8'))
+    REPLACE_CHAR = unichr(0xfffd).encode('utf-8')
 
+    if bigint.is_unicodepoint(value):
+        codepoint = bigint.toint(value)
+        unicode_char = unichr(codepoint)
+        bytes = unicode_char.encode('utf-8')
+    else:
+        bytes = REPLACE_CHAR
+
+    os.write(outfp, bytes)
+
+
+def warn_utf8_range(warnings, value):
+    warnings.warn(b'write-utf8-range', value)
+    os.write(outfp, unichr(0xfffd).encode('utf-8'))
 
 class Program(object):
     _immutable_fields_ = ['labels[**]', 'opcodes[*]', 'values[*]', 'size']
@@ -402,7 +404,8 @@ def mainloop(program, debug):
             elif op == c.OP_JMP:
                 jump = True
             elif op == c.OP_BRZ:
-                jump = 0 == selected.pop_longlong()
+                top = selected.pop()
+                jump = bigint.is_zero(top)
             else:
                 assert False
             if jump:
@@ -414,10 +417,10 @@ def mainloop(program, debug):
                     stacksize=stacksize, storage=storage, selected=selected)
                 continue
         elif op == c.OP_POPNUM:
-            r = selected.pop_longlong()
-            write_number(r)
+            r = selected.pop()
+            write_number(bigint.str(r))
         elif op == c.OP_POPCHAR:
-            r = selected.pop_longlong()
+            r = selected.pop()
             write_utf8(warnings, r)
         elif op == c.OP_PUSHNUM:
             num = read_number()
@@ -435,10 +438,9 @@ def mainloop(program, debug):
         pc += 1
 
     if len(selected) > 0:
-        return int(selected.pop_longlong())
+        return bigint.toint(selected.pop())
     else:
         return 0
-
 
 
 def open_w(filename):
@@ -482,7 +484,7 @@ def entry_point(argv):
         cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output, warning_limit, trace_limit = process_options(argv, os.environ)
     except SystemExit:
         return 1
-    
+
     warnings.limit = warning_limit
     if trace_limit >= 0:
         jit.set_param(driver, 'trace_limit', trace_limit)
