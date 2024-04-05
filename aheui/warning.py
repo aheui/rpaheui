@@ -14,6 +14,7 @@ class Warning(object):
 
 
 WARNING_LIST = [
+    Warning(b'no-rpython', b"[Warning:VirtualMachine] Running without rlib/jit.\n"),
     Warning(b'write-utf8-range', b'[Warning:UndefinedBehavior:write-utf8-range] value %x is out of unicode codepoint range.'),
 ]
 

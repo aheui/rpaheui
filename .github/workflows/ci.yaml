@@ -56,12 +56,18 @@ jobs:
           repository: pypy/pypy
           ref: release-pypy2.7-v7.3.15
           path: pypy
-      - name: Build
+      - name: Install Python package dependencies
+        run: |
+          pypy -m pip install -e .
+      - name: Python Test with snippets
+        run: |
+          cd snippets && PYTHONPATH=$GITHUB_WORKSPACE/pypy AHEUI='pypy ../rpaheui.py' ./test.sh --disable logo
+      - name: Build binary
         run: |
           export RPYTHON="pypy $GITHUB_WORKSPACE/pypy/rpython/bin/rpython"
           cd $GITHUB_WORKSPACE
           make -j 3
-      - name: Test with snippets
+      - name: Binary Test with snippets
         run: |
           cd "$GITHUB_WORKSPACE/snippets"
           AHEUI="$GITHUB_WORKSPACE/rpaheui-c" ./test.sh  --disable integer

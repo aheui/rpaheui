@@ -6,7 +6,7 @@ RPYTHONFLAGS?=--opt=jit --translation-jit_opencoder_model=big
 .PHONY: all rpaheui-c rpaheui-bigint-c test-bigint test-smallint test-py clean install
 
 
-all: aheui-bigint-c aheui-c aheui-py
+all: aheui-bigint-c aheui-c aheui-py ahsembler-py
 
 version:
 	echo "VERSION = '`git describe --tags`'" > aheui/version.py
@@ -15,11 +15,17 @@ aheui-py: version
 	cp rpaheui.py bin/aheui-py
 	cp rpaheui.py bin/aheui
 
+ahsembler-py:
+	cp ahsembler.py bin/ahsembler
+
 rpaheui-bigint-c: 
 	RPAHEUI_BIGINT=1 $(RPYTHON) $(RPYTHONFLAGS) --output rpaheui-bigint-c rpaheui.py
 
 rpaheui-c:
 	$(RPYTHON) $(RPYTHONFLAGS) rpaheui.py
+
+ahsembler-c:
+	$(RPYTHON) ahsembler.py  # No JIT
 
 aheui-bigint-c: rpaheui-bigint-c
 	cp rpaheui-bigint-c bin/aheui-bigint-c
