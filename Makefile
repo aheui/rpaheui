@@ -35,10 +35,10 @@ install: rpaheui-c rpaheui-bigint-c
 	cp rpaheui-c /usr/local/bin/rpaheui
 	ln -s /usr/local/bin/rpaheui /usr/local/bin/aheui
 
-test-bigint:
+test-bigint-c:
 	cd snippets && AHEUI="../rpaheui-bigint-c" bash test.sh
 
-test-smallint:
+test-c:
 	cd snippets && AHEUI="../rpaheui-c" bash test.sh --disable integer
 
 test-py:
