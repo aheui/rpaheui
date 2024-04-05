@@ -1,5 +1,5 @@
 
-from rpython.rlib.jit import elidable
+from aheui._compat import jit
 from rpython.rlib.rbigint import rbigint
 
 
@@ -26,31 +26,31 @@ def tolonglong(big):
     return big.tolonglong()
 
 
-@elidable
+@jit.elidable
 def add(r1, r2):
     return r1.add(r2)
 
 
-@elidable
+@jit.elidable
 def sub(r1, r2):
     return r1.sub(r2)
 
 
-@elidable
+@jit.elidable
 def mul(r1, r2):
     return r1.mul(r2)
 
 
-@elidable
+@jit.elidable
 def div(r1, r2):
     return r1.div(r2)
 
 
-@elidable
+@jit.elidable
 def mod(r1, r2):
     return r1.mod(r2)
 
 
-@elidable
+@jit.elidable
 def ge(r1, r2):
     return r1.ge(r2)
