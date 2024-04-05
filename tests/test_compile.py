@@ -17,6 +17,20 @@ def test_targets():
     assert list(map(lambda t: t[0], code1)) == list(map(lambda t: t[0], code3))
 
 
+def test_optimize_push():
+    c1 = compile.Compiler()
+    c1.compile(u'밤희')
+    c1.optimize1()
+    asm1 = c1.write_asm()
+
+    c2 = compile.Compiler()
+    c2.compile(u'반반따희')
+    c2.optimize1()
+    asm2 = c2.write_asm()
+
+    assert asm1 == asm2
+
+
 def test_optimize():
     compiler = compile.Compiler()
     compiler.compile(u'''상밢밢밣밦발받밧밥밣밦밦받밦밢밝받밝받밦밧밢받발받밧밣밦밥발받밝밥밧밦밦받밧받붑
