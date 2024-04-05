@@ -29,10 +29,10 @@ setup(
     author='Jeong YunWon',
     author_email='aheui@youknowone.org',
     url='https://github.com/aheui/rpaheui',
-    packages=(
+    packages=[
         'aheui',
         'aheui/int',
-    ),
+    ],
     package_data={
         'aheui': ['version.py']
     },
@@ -45,6 +45,7 @@ setup(
     scripts=[
         'bin/aheui-py',
         'bin/aheui',
+        'bin/ahsembler',
     ],
     classifiers=[
         'Intended Audience :: Developers',
