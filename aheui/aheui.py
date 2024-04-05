@@ -61,11 +61,6 @@ class LinkedList(object):
         node2 = node1.next
         node1.value, node2.value = node2.value, node1.value
 
-    def pop_longlong(self):
-        big_r = self.pop()
-        r = bigint.tolonglong(big_r)
-        return r
-
     def add(self):
         r1, r2 = self._get_2_values()
         r = bigint.add(r2, r1)
@@ -443,7 +438,7 @@ def mainloop(program, debug):
         pc += 1
 
     if len(selected) > 0:
-        return int(selected.pop_longlong())
+        return bigint.toint(selected.pop())
     else:
         return 0
 
