@@ -34,7 +34,7 @@ DEBUG = False  # debug flag for `rpaheui`
 MINUS1 = bigint.fromlong(-1)
 
 
-class Link(object):
+class Node(object):
     """Element unit for stack and queue."""
 
     def __init__(self, next, value=MINUS1):
@@ -102,7 +102,7 @@ class Stack(LinkedList):
 
     def push(self, value):
         # assert(isinstance(value, bigint.Int))
-        node = Link(self.head, value)
+        node = Node(self.head, value)
         self.head = node
         self.size += 1
 
@@ -121,7 +121,7 @@ class Stack(LinkedList):
 class Queue(LinkedList):
 
     def __init__(self):
-        self.tail = Link(None)
+        self.tail = Node(None)
         self.head = self.tail
         self.size = 0
 
@@ -129,14 +129,14 @@ class Queue(LinkedList):
         # assert(isinstance(value, bigint.Int))
         tail = self.tail
         tail.value = value
-        new = Link(None)
+        new = Node(None)
         tail.next = new
         self.tail = new
         self.size += 1
 
     def dup(self):
         head = self.head
-        node = Link(head, head.value)
+        node = Node(head, head.value)
         self.head = node
         self.size += 1
 
@@ -156,7 +156,7 @@ class Port(LinkedList):
 
     def push(self, value):
         # assert(isinstance(value, bigint.Int))
-        node = Link(self.head, value)
+        node = Node(self.head, value)
         self.head = node
         self.size += 1
         self.last_push = value
