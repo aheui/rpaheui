@@ -10,7 +10,7 @@ from aheui._argparse import InformationException, get_prog
 from aheui._compat import jit, unichr, ord, _unicode, bigint, PYR
 from aheui import compile
 from aheui.option import process_options, OptionError
-from aheui.warning import WarningPool
+from aheui.warning import NoRpythonWarning, WriteUtf8RangeWarning, warnings
 
 
 def get_location(pc, stackok, is_queue, program):
@@ -283,7 +283,7 @@ def write_number(value_str):
     os.write(outfp, value_str)
 
 
-def write_utf8(warnings, value):
+def write_utf8(value):
     REPLACE_CHAR = unichr(0xfffd).encode('utf-8')
 
     if bigint.is_unicodepoint(value):
@@ -296,8 +296,8 @@ def write_utf8(warnings, value):
     os.write(outfp, bytes)
 
 
-def warn_utf8_range(warnings, value):
-    warnings.warn(b'write-utf8-range', value)
+def warn_utf8_range(value):
+    warnings.warn(WriteUtf8RangeWarning, value)
     os.write(outfp, unichr(0xfffd).encode('utf-8'))
 
 class Program(object):
@@ -328,7 +328,6 @@ class Program(object):
 
 outfp = 1
 errfp = 2
-warnings = WarningPool()
 
 
 def mainloop(program, debug):
@@ -422,7 +421,7 @@ def mainloop(program, debug):
             write_number(bigint.str(r))
         elif op == c.OP_POPCHAR:
             r = selected.pop()
-            write_utf8(warnings, r)
+            write_utf8(r)
         elif op == c.OP_PUSHNUM:
             num = read_number()
             selected.push(num)
@@ -499,7 +498,7 @@ def entry_point(argv):
     outfp = 1 if output == '-' else open_w(output)
     if target == 'run':
         if not PYR:
-            warnings.warn(b'no-rpython')
+            warnings.warn(NoRpythonWarning)
         program = Program(compiler.lines, compiler.label_map)
         exitcode = mainloop(program, compiler.debug)
     elif target in ['asm', 'asm+comment']:

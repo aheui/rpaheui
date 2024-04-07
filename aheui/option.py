@@ -6,6 +6,7 @@ import os
 from aheui._argparse import ArgumentParser, ParserError
 from aheui._compat import bigint, PY3
 from aheui.version import VERSION
+from aheui.warning import CommandLineArgumentWarning, warnings
 from aheui import compile
 
 
@@ -56,16 +57,16 @@ class IntOptionParsingError(OptionError):
         return 'The value of %s="%s" is not a valid integer' % self.args
 
 
-class SourceError(Exception):
+class SourceError(OptionError):
     pass
 
 
-class NoInputError(Exception):
+class NoInputError(SourceError):
     def message(self):
         return "no input files"
 
 
-class CommandConflictInputFileError(Exception):
+class CommandConflictInputFileError(SourceError):
     def message(self):
         return "--cmd,-c and input file cannot be used together"
 
@@ -177,6 +178,9 @@ def process_options(argv, environ):
         else:
             assert False  # must be handled by argparse
             raise SystemExit()
+    else:
+        if target == 'run':
+            warnings.warn(CommandLineArgumentWarning, b'--target=run always ignores --output')
 
     warning_limit = kwarg_or_environ_int(kwargs, environ, 'warning-limit', 'RPAHEUI_WARNING_LIMIT', 3)
     trace_limit = kwarg_or_environ_int(kwargs, environ, 'trace-limit', 'RPAHEUI_TRACE_LIMIT', -1)

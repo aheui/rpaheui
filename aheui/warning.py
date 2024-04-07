@@ -5,36 +5,46 @@ from aheui._compat import jit
 
 
 class Warning(object):
-    def __init__(self, name, message):
-        self.name = name
-        self.message = message
-
     def format(self, *args):
-        return self.message % args
+        return self.MESSAGE % args
+    
+
+class NoRpythonWarning(Warning):
+    MESSAGE = b"[Warning:VirtualMachine] Running without rlib/jit."
+
+
+class CommandLineArgumentWarning(Warning):
+    MESSAGE = b"[Warning:CommandLine] Invalid command line argument is ignored: %s."
+
+
+class WriteUtf8RangeWarning(Warning):
+    MESSAGE = b'[Warning:UndefinedBehavior:write-utf8-range] value %x is out of unicode codepoint range.'
 
 
 WARNING_LIST = [
-    Warning(b'no-rpython', b"[Warning:VirtualMachine] Running without rlib/jit.\n"),
-    Warning(b'write-utf8-range', b'[Warning:UndefinedBehavior:write-utf8-range] value %x is out of unicode codepoint range.'),
+    NoRpythonWarning(),
+    CommandLineArgumentWarning(),
+    WriteUtf8RangeWarning(),
 ]
 
 
 class WarningPool(object):
     def __init__(self):
         self.limit = -1
-        self.warnings = {}
         self.counters = {}
         for w in WARNING_LIST:
-            self.warnings[w.name] = w
-            self.counters[w.name] = 0
+            self.counters[type(w).__name__] = 0
 
     @jit.dont_look_inside
-    def warn(self, name, *args):
-        warning = self.warnings[name]
+    def warn(self, warning, *args):
+        name = warning.__name__
         if self.limit != -1 and self.limit <= self.counters[name]:
             return
         self.counters[name] = self.counters[name] + 1
-        os.write(2, warning.format(*args))
+        os.write(2, warning().format(*args))
         os.write(2, b'\n')
         if self.limit != -1 and self.limit <= self.counters[name]:
-            os.write(2, b"[Warning:Meta] The warning '%s' has reached the limit %d and will be suppressed\n" % (warning.name, self.limit))
+            os.write(2, b"[Warning:Meta] The warning '%s' has reached the limit %d and will be suppressed\n" % (name, self.limit))
+
+
+warnings = WarningPool()
