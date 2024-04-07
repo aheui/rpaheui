@@ -480,6 +480,11 @@ def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, a
     return compiler
 
 
+def run_with_compiler(compiler):
+    program = Program(compiler.lines, compiler.label_map)
+    return mainloop(program, compiler.debug)
+
+
 def entry_point(argv):
     try:
         cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output, warning_limit, trace_limit = process_options(argv, os.environ)
@@ -499,8 +504,7 @@ def entry_point(argv):
     if target == 'run':
         if not PYR:
             warnings.warn(NoRpythonWarning)
-        program = Program(compiler.lines, compiler.label_map)
-        exitcode = mainloop(program, compiler.debug)
+        exitcode = run_with_compiler(compiler)
     elif target in ['asm', 'asm+comment']:
         asm = compiler.write_asm(commented=comment_aheuis).encode('utf-8')
         os.write(outfp, asm)
