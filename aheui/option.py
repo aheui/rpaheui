@@ -64,10 +64,11 @@ def kwarg_or_environ_int(kwargs, environ, arg_key, env_key, default):
     return value
 
 
-def process_options(argv, environ):
-    def open_r(filename):
-        return os.open(filename, os.O_RDONLY, 0o777)
+def open_input(filename):
+    return os.open(filename, os.O_RDONLY, 0o777)
 
+
+def process_options(argv, environ):
     kwargs, args = parser.parse_args(argv)
     if not args:
         raise SystemExit()
@@ -82,7 +83,7 @@ def process_options(argv, environ):
             fp = 0
             contents = compile.read(fp)
         else:
-            fp = open_r(filename)
+            fp = open_input(filename)
             contents = compile.read(fp)
             os.close(fp)
     else:
@@ -115,10 +116,12 @@ def process_options(argv, environ):
 
     if need_aheuic:
         aheuic_output = filename
-        if aheuic_output.endswith('.aheui'):
-            aheuic_output += 'c'
+        if filename.endswith('.aheui'):
+            aheuic_output = filename + 'c'
+        elif filename.endswith('.aheuis'):
+            aheuic_output = filename[:-1] + 'c'
         else:
-            aheuic_output += '.aheuic'
+            aheuic_output = filename + '.aheuic'
     else:
         aheuic_output = None
 
