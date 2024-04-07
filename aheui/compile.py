@@ -838,7 +838,7 @@ class Compiler(object):
             if op in c.OP_JUMPS:
                 self.label_map[val] = val
 
-    def write_asm(self, fp=1, commented=True):
+    def write_asm(self, commented=True):
         """Write assembly representation with comments."""
         codes = []
         for i, (op, val) in enumerate(self.lines):

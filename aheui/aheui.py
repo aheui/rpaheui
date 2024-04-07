@@ -447,7 +447,7 @@ def open_w(filename):
     return os.open(filename, os.O_WRONLY | os.O_CREAT, 0o644)
 
 
-def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, add_debug_info=False):
+def prepare_compiler(contents, opt_level=2, source='text', aheuic_output=None, add_debug_info=False):
     compiler = compile.Compiler()
     if source == 'bytecode':
         compiler.read_bytecode(contents)
