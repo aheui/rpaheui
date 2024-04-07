@@ -6,10 +6,11 @@ from __future__ import absolute_import
 import os
 
 from aheui import const as c
+from aheui._argparse import InformationException, get_prog
 from aheui._compat import jit, unichr, ord, _unicode, bigint, PYR
 from aheui import compile
-from aheui.option import process_options
-from aheui.warning import WarningPool
+from aheui.option import process_options, OptionError
+from aheui.warning import NoRpythonWarning, WriteUtf8RangeWarning, warnings
 
 
 def get_location(pc, stackok, is_queue, program):
@@ -34,7 +35,7 @@ DEBUG = False  # debug flag for `rpaheui`
 MINUS1 = bigint.fromlong(-1)
 
 
-class Link(object):
+class Node(object):
     """Element unit for stack and queue."""
 
     def __init__(self, next, value=MINUS1):
@@ -102,7 +103,7 @@ class Stack(LinkedList):
 
     def push(self, value):
         # assert(isinstance(value, bigint.Int))
-        node = Link(self.head, value)
+        node = Node(self.head, value)
         self.head = node
         self.size += 1
 
@@ -121,7 +122,7 @@ class Stack(LinkedList):
 class Queue(LinkedList):
 
     def __init__(self):
-        self.tail = Link(None)
+        self.tail = Node(None)
         self.head = self.tail
         self.size = 0
 
@@ -129,14 +130,14 @@ class Queue(LinkedList):
         # assert(isinstance(value, bigint.Int))
         tail = self.tail
         tail.value = value
-        new = Link(None)
+        new = Node(None)
         tail.next = new
         self.tail = new
         self.size += 1
 
     def dup(self):
         head = self.head
-        node = Link(head, head.value)
+        node = Node(head, head.value)
         self.head = node
         self.size += 1
 
@@ -156,7 +157,7 @@ class Port(LinkedList):
 
     def push(self, value):
         # assert(isinstance(value, bigint.Int))
-        node = Link(self.head, value)
+        node = Node(self.head, value)
         self.head = node
         self.size += 1
         self.last_push = value
@@ -282,7 +283,7 @@ def write_number(value_str):
     os.write(outfp, value_str)
 
 
-def write_utf8(warnings, value):
+def write_utf8(value):
     REPLACE_CHAR = unichr(0xfffd).encode('utf-8')
 
     if bigint.is_unicodepoint(value):
@@ -295,8 +296,8 @@ def write_utf8(warnings, value):
     os.write(outfp, bytes)
 
 
-def warn_utf8_range(warnings, value):
-    warnings.warn(b'write-utf8-range', value)
+def warn_utf8_range(value):
+    warnings.warn(WriteUtf8RangeWarning, value)
     os.write(outfp, unichr(0xfffd).encode('utf-8'))
 
 class Program(object):
@@ -327,7 +328,6 @@ class Program(object):
 
 outfp = 1
 errfp = 2
-warnings = WarningPool()
 
 
 def mainloop(program, debug):
@@ -421,7 +421,7 @@ def mainloop(program, debug):
             write_number(bigint.str(r))
         elif op == c.OP_POPCHAR:
             r = selected.pop()
-            write_utf8(warnings, r)
+            write_utf8(r)
         elif op == c.OP_PUSHNUM:
             num = read_number()
             selected.push(num)
@@ -483,7 +483,10 @@ def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, a
 def entry_point(argv):
     try:
         cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output, warning_limit, trace_limit = process_options(argv, os.environ)
-    except SystemExit:
+    except InformationException:
+        return 0
+    except OptionError as e:
+        os.write(errfp, b"%s: error: %s\n" % (get_prog(argv[0]), e.message()))
         return 1
 
     warnings.limit = warning_limit
@@ -495,7 +498,7 @@ def entry_point(argv):
     outfp = 1 if output == '-' else open_w(output)
     if target == 'run':
         if not PYR:
-            warnings.warn(b'no-rpython')
+            warnings.warn(NoRpythonWarning)
         program = Program(compiler.lines, compiler.label_map)
         exitcode = mainloop(program, compiler.debug)
     elif target in ['asm', 'asm+comment']:

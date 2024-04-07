@@ -3,9 +3,10 @@
 from __future__ import absolute_import
 
 import os
-from aheui._argparse import ArgumentParser
+from aheui._argparse import ArgumentParser, ParserError
 from aheui._compat import bigint, PY3
 from aheui.version import VERSION
+from aheui.warning import CommandLineArgumentWarning, warnings
 from aheui import compile
 
 
@@ -37,6 +38,39 @@ parser.add_argument('--version', '-v', narg='-1', default='no', description='Sho
 parser.add_argument('--help', '-h', narg='-1', default='no', description='Show this help text')
 
 
+class OptionError(Exception):
+    pass
+
+
+class ParsingError(OptionError):
+    def __init__(self, msg):
+        self.args = (msg,)
+
+    def message(self):
+        return self.args[0]
+
+
+class IntOptionParsingError(OptionError):
+    def __init__(self, key, value):
+        self.args = (key, value)
+    def message(self):
+        return 'The value of %s="%s" is not a valid integer' % self.args
+
+
+class SourceError(OptionError):
+    pass
+
+
+class NoInputError(SourceError):
+    def message(self):
+        return "no input files"
+
+
+class CommandConflictInputFileError(SourceError):
+    def message(self):
+        return "--cmd,-c and input file cannot be used together"
+
+
 def kwarg_or_environ(kwargs, environ, arg_key, env_key):
     if arg_key in kwargs and kwargs[arg_key] != '':
         return (1, kwargs[arg_key])
@@ -54,41 +88,39 @@ def kwarg_or_environ_int(kwargs, environ, arg_key, env_key, default):
         value = int(arg)
     except ValueError:
         if source == 1:
-            msg = b'The value of --%s="%s" is not a valid integer\n' % (arg_key, arg)
+            raise IntOptionParsingError('--' + arg_key, arg)
         elif source == 2:
-            msg = b'The value %s="%s" is not a valid integer\n' % (env_key, arg)
+            raise IntOptionParsingError(env_key, arg)
         else:
             assert False
-        os.write(2, msg)
-        raise
     return value
 
 
-def process_options(argv, environ):
-    def open_r(filename):
-        return os.open(filename, os.O_RDONLY, 0o777)
+def open_input(filename):
+    return os.open(filename, os.O_RDONLY, 0o777)
 
-    kwargs, args = parser.parse_args(argv)
-    if not args:
-        raise SystemExit()
+
+def process_options(argv, environ):
+    try:
+        kwargs, args = parser.parse_args(argv)
+    except ParserError as e:
+        raise ParsingError(e.message())
 
     cmd = kwargs['cmd']
     if cmd == '':
         if len(args) != 2:
-            os.write(2, b'aheui: error: no input files\n')
-            raise SystemExit()
+            raise NoInputError()
         filename = args[1]
         if filename == '-':
             fp = 0
             contents = compile.read(fp)
         else:
-            fp = open_r(filename)
+            fp = open_input(filename)
             contents = compile.read(fp)
             os.close(fp)
     else:
         if len(args) != 1:
-            os.write(2, b'aheui: error: --cmd,-c but input file found\n')
-            raise SystemExit()
+            raise CommandConflictInputFileError
         if PY3:
             cmd = cmd.encode('utf-8')
         contents = cmd
@@ -115,10 +147,12 @@ def process_options(argv, environ):
 
     if need_aheuic:
         aheuic_output = filename
-        if aheuic_output.endswith('.aheui'):
-            aheuic_output += 'c'
+        if filename.endswith('.aheui'):
+            aheuic_output = filename + 'c'
+        elif filename.endswith('.aheuis'):
+            aheuic_output = filename[:-1] + 'c'
         else:
-            aheuic_output += '.aheuic'
+            aheuic_output = filename + '.aheuic'
     else:
         aheuic_output = None
 
@@ -142,8 +176,11 @@ def process_options(argv, environ):
         elif target == 'run':
             output = '-'
         else:
-            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "asm+comment", "run"\n')  # noqa: E501
+            assert False  # must be handled by argparse
             raise SystemExit()
+    else:
+        if target == 'run':
+            warnings.warn(CommandLineArgumentWarning, b'--target=run always ignores --output')
 
     warning_limit = kwarg_or_environ_int(kwargs, environ, 'warning-limit', 'RPAHEUI_WARNING_LIMIT', 3)
     trace_limit = kwarg_or_environ_int(kwargs, environ, 'trace-limit', 'RPAHEUI_TRACE_LIMIT', -1)
