@@ -3,7 +3,7 @@
 from __future__ import absolute_import
 
 import os
-from aheui._argparse import ArgumentParser
+from aheui._argparse import ArgumentParser, ParserError
 from aheui._compat import bigint, PY3
 from aheui.version import VERSION
 from aheui import compile
@@ -37,6 +37,39 @@ parser.add_argument('--version', '-v', narg='-1', default='no', description='Sho
 parser.add_argument('--help', '-h', narg='-1', default='no', description='Show this help text')
 
 
+class OptionError(Exception):
+    pass
+
+
+class ParsingError(OptionError):
+    def __init__(self, msg):
+        self.args = (msg,)
+
+    def message(self):
+        return self.args[0]
+
+
+class IntOptionParsingError(OptionError):
+    def __init__(self, key, value):
+        self.args = (key, value)
+    def message(self):
+        return 'The value of %s="%s" is not a valid integer' % self.args
+
+
+class SourceError(Exception):
+    pass
+
+
+class NoInputError(Exception):
+    def message(self):
+        return "no input files"
+
+
+class CommandConflictInputFileError(Exception):
+    def message(self):
+        return "--cmd,-c and input file cannot be used together"
+
+
 def kwarg_or_environ(kwargs, environ, arg_key, env_key):
     if arg_key in kwargs and kwargs[arg_key] != '':
         return (1, kwargs[arg_key])
@@ -54,13 +87,11 @@ def kwarg_or_environ_int(kwargs, environ, arg_key, env_key, default):
         value = int(arg)
     except ValueError:
         if source == 1:
-            msg = b'The value of --%s="%s" is not a valid integer\n' % (arg_key, arg)
+            raise IntOptionParsingError('--' + arg_key, arg)
         elif source == 2:
-            msg = b'The value %s="%s" is not a valid integer\n' % (env_key, arg)
+            raise IntOptionParsingError(env_key, arg)
         else:
             assert False
-        os.write(2, msg)
-        raise
     return value
 
 
@@ -69,15 +100,15 @@ def open_input(filename):
 
 
 def process_options(argv, environ):
-    kwargs, args = parser.parse_args(argv)
-    if not args:
-        raise SystemExit()
+    try:
+        kwargs, args = parser.parse_args(argv)
+    except ParserError as e:
+        raise ParsingError(e.message())
 
     cmd = kwargs['cmd']
     if cmd == '':
         if len(args) != 2:
-            os.write(2, b'aheui: error: no input files\n')
-            raise SystemExit()
+            raise NoInputError()
         filename = args[1]
         if filename == '-':
             fp = 0
@@ -88,8 +119,7 @@ def process_options(argv, environ):
             os.close(fp)
     else:
         if len(args) != 1:
-            os.write(2, b'aheui: error: --cmd,-c but input file found\n')
-            raise SystemExit()
+            raise CommandConflictInputFileError
         if PY3:
             cmd = cmd.encode('utf-8')
         contents = cmd
@@ -145,7 +175,7 @@ def process_options(argv, environ):
         elif target == 'run':
             output = '-'
         else:
-            os.write(2, b'aheui: error: --target,-t must be one of "bytecode", "asm", "asm+comment", "run"\n')  # noqa: E501
+            assert False  # must be handled by argparse
             raise SystemExit()
 
     warning_limit = kwarg_or_environ_int(kwargs, environ, 'warning-limit', 'RPAHEUI_WARNING_LIMIT', 3)

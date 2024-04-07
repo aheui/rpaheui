@@ -6,9 +6,10 @@ from __future__ import absolute_import
 import os
 
 from aheui import const as c
+from aheui._argparse import InformationException, get_prog
 from aheui._compat import jit, unichr, ord, _unicode, bigint, PYR
 from aheui import compile
-from aheui.option import process_options
+from aheui.option import process_options, OptionError
 from aheui.warning import WarningPool
 
 
@@ -483,7 +484,10 @@ def prepare_compiler(contents, opt_level=2, source='code', aheuic_output=None, a
 def entry_point(argv):
     try:
         cmd, source, contents, str_opt_level, target, aheuic_output, comment_aheuis, output, warning_limit, trace_limit = process_options(argv, os.environ)
-    except SystemExit:
+    except InformationException:
+        return 0
+    except OptionError as e:
+        os.write(errfp, b"%s: error: %s\n" % (get_prog(argv[0]), e.message()))
         return 1
 
     warnings.limit = warning_limit

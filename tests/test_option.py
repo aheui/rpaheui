@@ -1,4 +1,5 @@
 import pytest
+from aheui import option
 from aheui.option import process_options
 
 
@@ -26,9 +27,9 @@ def test_option_cmd(mocker):
     assert (heui, 'text', heui, '1', 'run', None, False, '-', 3, -1) == process_options(['aheui-c', '-c', '희'], {})
     assert (heui, 'text', heui, '1', 'run', None, False, '-', 3, -1) == process_options(['aheui-c', '-c', '희', '--output=-'], {})
     assert (heui, 'text', heui, '1', 'run', None, False, 'out', 3, -1) == process_options(['aheui-c', '-c', '희', '--output=out'], {})
-    # with pytest.raises(SystemExit):
-    #     process_options(['aheui-c', '-c'], {})
-    with pytest.raises(SystemExit):
+    with pytest.raises(option.ParsingError):
+        process_options(['aheui-c', '-c'], {})
+    with pytest.raises(option.CommandConflictInputFileError):
         process_options(['aheui-c', '-c', '희', 'x'], {})
     assert (heui, 'text', heui, '1', 'asm', None, False, '-', 3, -1) == process_options(['aheui-c', '-c', '희', '--target=asm'], {})
     assert (heui, 'text', heui, '1', 'asm', None, False, '-', 3, -1) == process_options(['aheui-c', '-c', '희', '--target=asm', '--output=-'], {})

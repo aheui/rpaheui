@@ -25,12 +25,14 @@ class ArgumentNotInChoicesError(ParserError):
     __description__ = 'argument is not in choices: '
 
 
-class InformationException(ParserError):
-    __description__ = ''
+class InformationException(Exception):
+    def __init__(self, desc=''):
+        self.desc = desc
+
 
 
 class HelpException(InformationException):
-    __description__ = ''
+    pass
 
 
 class ArgumentParser(object):
@@ -88,7 +90,10 @@ class ArgumentParser(object):
                             done = True
                         elif name.startswith('-'):
                             if name == arg:
-                                arg = args[idx + 1]
+                                try:
+                                    arg = args[idx + 1]
+                                except IndexError:
+                                    raise TooFewArgumentError(name)
                                 parsed[dest] = arg
                                 idx += 2
                             else:
@@ -113,7 +118,7 @@ class ArgumentParser(object):
         try:
             return self._parse_args(args)
         except HelpException:
-            os.write(2, 'usage: %s [option] ... file\n\n' % self.kwargs.get('prog', args[0]))
+            os.write(2, 'usage: %s [option] ... file\n\n' % get_prog(args[0]))
             for names, opt in self.arguments:
                 name = names[0] if names[0] == names[1] else ('%s,%s' % names[0:2])
                 os.write(2, '%s%s: %s' % (name, ' ' * (12 - len(name)), opt['description']))
@@ -125,9 +130,11 @@ class ArgumentParser(object):
                     os.write(2, '\n')
                     os.write(2, opt['full_description'])
                 os.write(2, '\n')
+            raise
         except InformationException as e:
             os.write(2, '%s\n' % e.desc)
-        except ParserError as e:
-            prog = self.kwargs.get('prog', args[0])
-            os.write(2, '%s: error: %s\n' % (prog, e.message()))
-        return {}, []
+            raise
+
+
+def get_prog(arg0):
+    return arg0.rsplit('/', 1)[-1]
