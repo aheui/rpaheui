@@ -5,7 +5,7 @@ from __future__ import absolute_import
 
 import os
 import aheui.const as c
-from aheui._compat import unichr, _unicode
+from aheui._compat import unichr, _unicode, PY3
 
 
 OP_NAMES = [None, None, u'DIV', u'ADD', u'MUL', u'MOD', u'POP', u'PUSH', u'DUP', u'SEL', u'MOV', None, u'CMP', None, u'BRZ', None, u'SUB', u'SWAP', u'HALT', u'POPNUM', u'POPCHAR', u'PUSHNUM', u'PUSHCHAR', u'BRPOP2', u'BRPOP1', u'JMP']
@@ -815,10 +815,15 @@ class Compiler(object):
             assert len(p) == 4
             codes.append(p)
         codes.append('\xff\xff\xff\xff')
-        return ''.join(codes)
+        code = ''.join(codes)
+        if PY3:
+            code = code.encode('utf-8')
+        return code
 
     def read_bytecode(self, text):
         """Read bytecodes from data text."""
+        if PY3:
+            text = text.decode('utf-8')
         self.debug = None
         self.lines = []
         self.label_map = {}
@@ -838,7 +843,7 @@ class Compiler(object):
             if op in c.OP_JUMPS:
                 self.label_map[val] = val
 
-    def write_asm(self, fp=1, commented=True):
+    def write_asm(self, commented=True):
         """Write assembly representation with comments."""
         codes = []
         for i, (op, val) in enumerate(self.lines):
