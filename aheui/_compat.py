@@ -100,3 +100,8 @@ if USE_BIGINT:
     from aheui.int import bigint  # Enable bigint in rpython build
 else:
     from aheui.int import smallint as bigint  # noqa: F401 smallint or python support
+
+try:
+    from aheui.storage.linkedlist import Stack, Queue, Port
+except ImportError:
+    from aheui.storage.array import Stack, Queue, Port  # noqa: F401 smallint or python support

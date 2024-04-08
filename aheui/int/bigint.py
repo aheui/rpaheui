@@ -1,5 +1,5 @@
 
-from aheui._compat import jit
+from rpython.rlib import jit
 from rpython.rlib.rbigint import rbigint
 
 
@@ -72,3 +72,6 @@ def is_zero(r):
 @jit.elidable
 def is_unicodepoint(r):
     return 0 <= r._size and r.int_le(0x110000)
+
+
+MINUS1 = fromlong(-1)

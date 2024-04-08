@@ -14,7 +14,7 @@ Int = int
 
 
 def fromstr(s):
-    return int(s)
+    return Int(s)
 
 
 def fromint(v):
@@ -71,3 +71,6 @@ def is_zero(r):
 
 def is_unicodepoint(r):
     return 0 < r <= 0x110000
+
+
+MINUS1 = Int(-1)
