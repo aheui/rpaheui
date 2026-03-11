@@ -1,6 +1,7 @@
 
 RPYTHON?=../pypy/rpython/bin/rpython
-RPYTHONFLAGS?=--opt=jit --translation-jit_opencoder_model=big
+RPYTHONFLAGS?=--opt=jit
+export PYPY_DONT_RUN_SUBPROCESS=1
 
 
 .PHONY: all rpaheui-c rpaheui-bigint-c test-bigint test-smallint test-py clean install
