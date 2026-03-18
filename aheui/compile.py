@@ -414,11 +414,17 @@ class Compiler(object):
             self.debug = new_debug
 
     def optimize_jump(self):
-        for label, direct_target in self.label_map.items():
-            op, operand = self.lines[direct_target]
-            if op == c.OP_JMP:
-                indirect_target = self.label_map[operand]
-                self.label_map[label] = indirect_target
+        while True:
+            changed = False
+            for label, direct_target in list(self.label_map.items()):
+                op, operand = self.lines[direct_target]
+                if op == c.OP_JMP:
+                    indirect_target = self.label_map[operand]
+                    if indirect_target != direct_target:
+                        self.label_map[label] = indirect_target
+                        changed = True
+            if not changed:
+                break
 
     def optimize_deadcode1(self):
         """Optimize codes by removing unreachable codes.
@@ -437,9 +443,11 @@ class Compiler(object):
         """
         min_stacksize_map = [-1] * len(self.lines)
         job_queue = [(0, 0)]
+        job_index = 0
 
-        while len(job_queue) > 0:
-            pc, stacksize = job_queue.pop(0)
+        while job_index < len(job_queue):
+            pc, stacksize = job_queue[job_index]
+            job_index += 1
             while pc < len(self.lines):
                 op, val = self.lines[pc]
                 min_stacksize = min_stacksize_map[pc]
@@ -480,15 +488,18 @@ class Compiler(object):
 
     def optimize_deadcode2(self):
         min_stacksize_map = [[-1] * c.STORAGE_COUNT] * len(self.lines)
+        label_targets = list(self.label_map.values())
         job_queue = [(0, 0, [0] * c.STORAGE_COUNT)]
+        job_index = 0
 
         def min_list(l1, l2):
             if l1[0] == -1:
                 return l2[:]
             return [min(l1[i], l2[i]) for i in range(0, c.STORAGE_COUNT)]
 
-        while len(job_queue) > 0:
-            pc, selected, stacksizes = job_queue.pop(0)
+        while job_index < len(job_queue):
+            pc, selected, stacksizes = job_queue[job_index]
+            job_index += 1
             while pc < len(self.lines):
                 stacksize = stacksizes[selected]
                 assert stacksize >= 0
@@ -500,7 +511,7 @@ class Compiler(object):
                         break
                 if op == c.OP_BRPOP1 or op == c.OP_BRPOP2:
                     reqsize = c.OP_REQSIZE[op]
-                    if min_stacksizes[selected] >= reqsize:
+                    if stacksize >= reqsize and pc not in label_targets:
                         pc += 1
                         continue
                     else:
@@ -654,11 +665,13 @@ class Compiler(object):
             codes and consists of only constants instructions, merge it.
         """
         job_queue = [(0, 0)]
+        job_index = 0
 
         lines = self.lines
         queue_map = [-1] * len(lines)
-        while len(job_queue) > 0:
-            pc, in_queue = job_queue.pop(0)
+        while job_index < len(job_queue):
+            pc, in_queue = job_queue[job_index]
+            job_index += 1
             while pc < len(lines):
                 op, val = lines[pc]
                 if queue_map[pc] >= 0:
@@ -684,7 +697,7 @@ class Compiler(object):
                 if queueable and u'QUEUE' not in self.debug.comments[pc]:
                     self.debug.comments[pc].append(u'QUEUE')
 
-        label_targets = self.label_map.values()
+        label_targets = list(self.label_map.values())
         label_rmap = {}
         for k, v in self.label_map.items():
             if v in label_rmap:
@@ -692,13 +705,13 @@ class Compiler(object):
             else:
                 label_rmap[v] = k
 
-        reachability = [int(queue_map[i] >= 0) for i in range(0, len(lines))]
+        removed = [0 for _ in range(0, len(lines))]
 
         if optimize_dup:
             for i in range(1, len(lines)):
                 op, val = lines[i]
                 i1 = i - 1
-                while lines[i1][0] == c.OP_NONE and i1 >= 0:
+                while i1 > 0 and lines[i1][0] == c.OP_NONE:
                     i1 -= 1
                 if queue_map[i] or queue_map[i1]:
                     continue
@@ -714,10 +727,12 @@ class Compiler(object):
             op, v = lines[i]
             i1 = i - 1
 
-            while lines[i1][0] == c.OP_NONE and i1 >= 1:
+            while i1 >= 1 and lines[i1][0] == c.OP_NONE:
                 i1 -= 1
+            if i1 <= 0:
+                continue
             i2 = i1 - 1
-            while lines[i1][0] == c.OP_NONE and i2 >= 0:
+            while i2 > 0 and lines[i2][0] == c.OP_NONE:
                 i2 -= 1
             op1, v1 = lines[i1]
             op2, v2 = lines[i2]
@@ -772,7 +787,7 @@ class Compiler(object):
             if is_jmp:
                 lines[i1] = (c.OP_PUSH, v)
                 lines[i2] = (c.OP_NONE, -1)
-                reachability[i2] = 0
+                removed[i2] = 1
                 jv = lines[i][1]
                 target = self.label_map[jv]
                 self.label_map[jv] += 1
@@ -789,9 +804,61 @@ class Compiler(object):
                 lines[i] = (c.OP_PUSH, v)
                 lines[i1] = (c.OP_NONE, -1)
                 lines[i2] = (c.OP_NONE, -1)
-                reachability[i1] = 0
-                reachability[i2] = 0
+                removed[i1] = 1
+                removed[i2] = 1
                 #  self.debug.show(i)
+
+        for i in range(1, len(lines)):
+            op, v = lines[i]
+            if op != c.OP_BRZ:
+                continue
+            i1 = i - 1
+            while i1 > 0 and lines[i1][0] == c.OP_NONE:
+                i1 -= 1
+            op1, v1 = lines[i1]
+            if op1 != c.OP_PUSH:
+                continue
+            if queue_map[i] or queue_map[i1]:
+                continue
+            if i1 in label_targets or i in label_targets:
+                continue
+
+            lines[i1] = (c.OP_NONE, -1)
+            removed[i1] = 1
+            if v1 == 0:
+                lines[i] = (c.OP_JMP, v)
+            else:
+                lines[i] = (c.OP_NONE, -1)
+                removed[i] = 1
+
+        control_reachability = self.compute_control_reachability()
+        return [
+            int(control_reachability[i] and not removed[i])
+            for i in range(0, len(lines))
+        ]
+
+    def compute_control_reachability(self):
+        reachability = [0 for _ in range(0, len(self.lines))]
+        job_queue = [0]
+        job_index = 0
+
+        while job_index < len(job_queue):
+            pc = job_queue[job_index]
+            job_index += 1
+            while pc < len(self.lines) and not reachability[pc]:
+                reachability[pc] = 1
+                op, val = self.lines[pc]
+                if op in [c.OP_BRZ, c.OP_BRPOP1, c.OP_BRPOP2]:
+                    job_queue.append(pc + 1)
+                    job_queue.append(self.label_map[val])
+                    break
+                elif op == c.OP_JMP:
+                    job_queue.append(self.label_map[val])
+                    break
+                elif op == c.OP_HALT:
+                    break
+                else:
+                    pc += 1
 
         return reachability
 

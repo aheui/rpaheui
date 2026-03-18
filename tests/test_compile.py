@@ -31,6 +31,57 @@ def test_optimize_push():
     assert asm1 == asm2
 
 
+def test_optimize2_eliminates_static_brpop():
+    compiler = compile.Compiler()
+    compiler.compile(u'반반다희')
+    compiler.optimize2()
+
+    assert compiler.lines == [
+        (compile.c.OP_PUSH, 4),
+        (compile.c.OP_HALT, -1),
+    ]
+
+
+def test_optimize_jump_resolves_chains():
+    compiler = compile.Compiler()
+    compiler.lines = [
+        (compile.c.OP_JMP, 1),
+        (compile.c.OP_JMP, 2),
+        (compile.c.OP_JMP, 3),
+        (compile.c.OP_HALT, -1),
+    ]
+    compiler.label_map = {1: 1, 2: 2, 3: 3}
+
+    compiler.optimize_jump()
+
+    assert compiler.label_map[1] == 3
+    assert compiler.label_map[2] == 3
+
+
+def test_optimize_operation_folds_zero_brz():
+    compiler = compile.Compiler()
+    compiler.lines = [
+        (compile.c.OP_PUSH, 0),
+        (compile.c.OP_BRZ, 1),
+        (compile.c.OP_PUSH, 9),
+        (compile.c.OP_HALT, -1),
+        (compile.c.OP_PUSH, 7),
+        (compile.c.OP_HALT, -1),
+    ]
+    compiler.label_map = {1: 4}
+
+    reachability = compiler.optimize_operation(True)
+    compiler.optimize_jump()
+    compiler.optimize_adjust(reachability)
+
+    assert compiler.lines == [
+        (compile.c.OP_JMP, 1),
+        (compile.c.OP_PUSH, 7),
+        (compile.c.OP_HALT, -1),
+    ]
+    assert compiler.label_map[1] == 1
+
+
 def test_optimize():
     compiler = compile.Compiler()
     compiler.compile(u'''상밢밢밣밦발받밧밥밣밦밦받밦밢밝받밝받밦밧밢받발받밧밣밦밥발받밝밥밧밦밦받밧받붑
