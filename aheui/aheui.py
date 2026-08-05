@@ -377,6 +377,11 @@ def entry_point(argv):
         os.write(outfp, bytecode)
         os.close(outfp)
         exitcode = 0
+    elif target == 'c++':
+        c_source = compiler.write_cpp().encode('utf-8')
+        os.write(outfp, c_source)
+        os.close(outfp)
+        exitcode = 0
     else:
         assert False
     return exitcode

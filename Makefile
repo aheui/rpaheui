@@ -1,7 +1,8 @@
 
 RPYTHON?=../pypy/rpython/bin/rpython
-RPYTHONFLAGS?=--opt=jit
+RPYTHONFLAGS?=--opt=jit --lto
 export PYPY_DONT_RUN_SUBPROCESS=1
+CXXFLAGS=-std=c++14 -Wall -Os
 
 
 .PHONY: all rpaheui-c rpaheui-bigint-c test-bigint test-smallint test-py clean install
@@ -51,3 +52,6 @@ test-c:
 test-py:
 	pytest
 	cd snippets && AHEUI=../bin/aheui bash test.sh --disable logo
+
+test-template-cc:
+	$(CXX) $(CXXFLAGS) aheui/template.cc && ./a.out

@@ -7,11 +7,26 @@ import os
 import aheui.const as c
 from aheui._compat import unichr, _unicode, PY3
 
+fcc = os.open('aheui/template.cc', os.O_RDONLY, 0o777)
+template_cc = os.read(fcc, 100000).decode('utf-8')  # inlining template
+os.close(fcc)
+del fcc
+
 
 OP_NAMES = [None, None, u'DIV', u'ADD', u'MUL', u'MOD', u'POP', u'PUSH', u'DUP', u'SEL', u'MOV', None, u'CMP', None, u'BRZ', None, u'SUB', u'SWAP', u'HALT', u'POPNUM', u'POPCHAR', u'PUSHNUM', u'PUSHCHAR', u'BRPOP2', u'BRPOP1', u'JMP']
 
 OP_HASOP = [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 OP_USEVAL = [0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1]
+
+
+def op_name(op):
+    """`OP_NAMES` holds None for the unassigned opcodes; the annotator will
+    not let a `can_be_None` unicode reach `.encode`."""
+    name = OP_NAMES[op]
+    if name is None:
+        return u'inst%s' % _unicode(op)
+    return name
+
 VAL_CONSTS = [0, 2, 4, 4, 2, 5, 5, 3, 5, 7, 9, 9, 7, 9, 9, 8, 4, 4, 6, 2, 4, 1, 3, 4, 3, 4, 4, 3]
 #             () ㄱ ㄲ ㄳ ㄴ ㄵ ㄶ ㄷ ㄹ ㄺ ㄻ ㄼ ㄽ ㄾ ㄿ ㅀ ㅁ ㅂ ㅄ ㅅ ㅆ ㅇ ㅈ ㅊ ㅋ ㅌ ㅍ ㅎ
 
@@ -923,8 +938,6 @@ class Compiler(object):
             assert code is not None
             if len(code.encode('utf-8')) == 3:
                 code += u' '
-            if code is None:
-                code = u'inst%s' % _unicode(op)
             if OP_USEVAL[op]:
                 if op in c.OP_JUMPS:
                     slabel = padding(_unicode(self.label_map[val]), 3)
@@ -996,3 +1009,33 @@ class Compiler(object):
         for key in label_map.keys():
             self.label_map[label_map[key]] = label_name_map[key]
         self.debug = Debug(lines, comments)
+
+    def write_cpp(self):
+        """Write C code with comments."""
+        codes = []
+        for i, (op, val) in enumerate(self.lines):
+            if i in self.label_map.values():
+                label_str = u'L%s:' % _unicode(i)
+                codes.append(padding(label_str, 8))
+            else:
+                codes.append(u' ' * 8)
+            code = op_name(op).encode('utf-8').lower().decode('utf-8')  # rpython workaround
+            if op in c.OP_JUMPS:
+                slabel = _unicode(self.label_map[val])
+                if op != c.OP_JMP:
+                    code_val = u'if (r->jump_%s()) goto L%s' % (code, slabel)
+                else:
+                    code_val = u'goto L%s' % slabel
+            else:
+                if OP_USEVAL[op]:
+                    param = _unicode(val)
+                else:
+                    param = u''
+                code_val = u'r->%s(%s)' % (code, param)
+            comment = self.debug.comment(i) if self.debug else u''
+            sline = padding(_unicode(i), 3)
+            codes.append(u'%s; // L%s %s\n' % (code_val, sline, comment))
+        gen_code = u''.join(codes)
+        splited_cc = template_cc.split(u'\n')
+        splited_cc[splited_cc.index(u'///GENERATED_CODE///')] = gen_code
+        return u'\n'.join(splited_cc)

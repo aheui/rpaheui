@@ -21,9 +21,10 @@ parser.add_argument('--source', '-S', default='auto', choices='auto,bytecode,asm
 \t- `asm+comment`: Same as `asm` with comments.
 \t- usage: `--source=asm`, `-Sbytecode` or `-S text`
 """)
-parser.add_argument('--target', '-T', default='run', choices='run,bytecode,asm,asm+comment', description='Set target filetype.', full_description="""\t- `run`: Run given code.
+parser.add_argument('--target', '-T', default='run', choices='run,bytecode,asm,asm+comment,c++', description='Set target filetype.', full_description="""\t- `run`: Run given code.
 \t- `bytecode`: Aheui bytecode. (Bytecode representation of `ahsembly`.
 \t- `asm`: See `ahsembly`.
+\t- `c++`: C++ source built on `aheui/template.cc`.
 \t- usage: `--target=asm`, `-Tbytecode` or `-T run`
 """)
 parser.add_argument('--output', '-o', default='', description='Output file. Default is ``. See details for each target. If the value is `-`, it is standard output.', full_description="""\t- `run` target: This option is not availble and ignored.
@@ -175,6 +176,8 @@ def process_options(argv, environ):
             comment_aheuis = target == 'asm+comment'
         elif target == 'run':
             output = '-'
+        elif target == 'c++':
+            output = filename + '.cc'
         else:
             assert False  # must be handled by argparse
             raise SystemExit()
